@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Turbogram</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#3390ec">
+<style>
+:root{--pan:#fff;--hov:#f1f3f5;--sel:#3390ec;--tx:#000;--mu:#707579;--ac:#3390ec;--in:#fff;--out:#eeffde;--bd:#e4e6e8;--chat:linear-gradient(160deg,#dbe8c9,#c3d8c4 50%,#b7cfd3);box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--pan:#212121;--hov:#2c2c2c;--sel:#8774e1;--tx:#fff;--mu:#aaa;--ac:#8774e1;--in:#212121;--out:#766ac8;--bd:#303030;--chat:linear-gradient(160deg,#0f0f0f,#16121f);color-scheme:dark}}
+:root[data-theme="dark"]{--pan:#212121;--hov:#2c2c2c;--sel:#8774e1;--tx:#fff;--mu:#aaa;--ac:#8774e1;--in:#212121;--out:#766ac8;--bd:#303030;--chat:linear-gradient(160deg,#0f0f0f,#16121f);color-scheme:dark}
+html,body{height:100%;margin:0}
+body{background:var(--pan);color:var(--tx);font:15px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+#app{display:flex;height:100%}
+#side{width:330px;flex:none;display:flex;flex-direction:column;background:var(--pan);border-right:1px solid var(--bd)}
+#pane{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--chat)}
+.top{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--pan);height:40px}
+.top .ic{font-size:22px;color:var(--mu)}
+#q{flex:1;background:var(--hov);border:0;border-radius:20px;padding:9px 14px;color:var(--tx);font:inherit;outline:0}
+#list{overflow-y:auto;flex:1;padding:0 6px}
+.it{display:flex;gap:10px;padding:8px;border-radius:10px;cursor:pointer;align-items:center}
+.it:hover{background:var(--hov)}.it.on{background:var(--sel);color:#fff}.it.on .mu{color:#ffffffcc}
+.av{width:46px;height:46px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:600;font-size:20px}
+.av.s{width:34px;height:34px;font-size:15px}
+.it .b{flex:1;min-width:0}.it .r{display:flex;justify-content:space-between;gap:8px}
+.it .t{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mu{color:var(--mu);font-size:13px}.it .pv{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hd{display:flex;align-items:center;gap:10px;padding:6px 14px;background:var(--pan);border-bottom:1px solid var(--bd);height:44px}
+.hd .t{font-weight:600}.hd .back{display:none;font-size:24px;background:none;border:0;color:var(--ac);cursor:pointer;padding:0 6px}
+main{flex:1;overflow-y:auto;padding:10px 12px}
+.sep{text-align:center;margin:10px 0}.sep span{background:#00000055;color:#fff;border-radius:12px;padding:2px 10px;font-size:13px}
+.row{display:flex;margin:2px 0;gap:6px;align-items:flex-end}.row.me{justify-content:flex-end}
+.bub{max-width:min(78%,480px);background:var(--in);padding:6px 10px 5px;border-radius:14px;overflow-wrap:anywhere;box-shadow:0 1px 1px #0002;color:var(--tx)}
+.row.me .bub{background:var(--out);border-bottom-right-radius:4px}.row:not(.me) .bub{border-bottom-left-radius:4px}
+.me .bub{color:var(--tx)}
+:root:not([data-theme="light"]) .row.me .bub{color:#fff}
+.who{font-size:13px;font-weight:600;color:var(--ac)}
+.ts{float:right;margin:6px 0 0 10px;font-size:11px;color:var(--mu)}
+.bub.gift{text-align:center;padding:14px 22px;max-width:260px;background:#00000066;color:#fff}
+.gift .e{font-size:56px;line-height:1.1}.gift .ts{float:none;display:block;color:#ffffffaa}
+.note{background:#00000055;color:#fff;border-radius:12px;padding:6px 12px;margin:8px auto;font-size:13px;max-width:fit-content;text-align:center}
+.card{background:var(--pan);border-radius:12px;padding:12px;margin-bottom:12px;max-width:640px;margin-left:auto;margin-right:auto}
+.card h2{margin:0 0 8px;font-size:15px}.card .note{background:none;color:var(--mu);padding:0;margin:0}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px}
+.g{background:var(--hov);border-radius:10px;padding:8px;text-align:center;font-size:13px}.g .e{font-size:34px}
+footer{padding:8px 10px;display:flex;gap:8px;align-items:flex-end}
+.box{flex:1;display:flex;align-items:center;gap:6px;background:var(--pan);border-radius:22px;padding:4px 12px}
+.box input{flex:1;border:0;background:none;color:var(--tx);font:inherit;padding:8px 0;outline:0;min-width:0}
+.box button{background:none;border:0;font-size:22px;cursor:pointer;color:var(--mu);padding:0}
+#send{width:44px;height:44px;border-radius:50%;border:0;background:var(--ac);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;flex:none}
+#emo{display:flex;flex-wrap:wrap;gap:4px;padding:6px 12px;background:var(--pan);font-size:24px;cursor:pointer}
+input.f,select{font:inherit;color:var(--tx);background:var(--hov);border:1px solid var(--bd);border-radius:10px;padding:9px 11px;min-width:0}
+.fr{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:4px 0}.fr>*{flex:1 1 120px}
+button.p{background:var(--ac);color:#fff;border:0;border-radius:10px;padding:9px 16px;font:inherit;cursor:pointer}
+button.s{background:none;border:0;color:var(--mu);cursor:pointer;font-size:12px;flex:none}
+#auth{position:fixed;inset:0;z-index:20;background:var(--chat);display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box}
+.ac{background:var(--pan);border-radius:16px;padding:22px;width:min(100%,340px);display:flex;flex-direction:column;gap:10px}
+.ac h1{margin:0;font-size:20px;text-align:center}.ac .err{color:#e5484d;min-height:18px;font-size:13px}.ac p{margin:0;text-align:center}
+.sec{color:var(--ac);font-weight:600;font-size:13px;padding:10px 8px 2px}
+.bd2{background:var(--ac);color:#fff;border-radius:10px;min-width:20px;padding:0 6px;text-align:center;font-size:12px;flex:none}
+.it .r>.pv{min-width:0}
+[hidden]{display:none!important}
+@media(max-width:720px){#side{width:100%;border:0}#pane{display:none}#app.open #side{display:none}#app.open #pane{display:flex}.hd .back{display:block}}
+</style>
+</head>
+<body>
+<div id="auth"><div class="ac"><p class="mu">Подключение…</p></div></div>
+<div id="app">
+<aside id="side"><div class="top"><span class="ic">☰</span><input id="q" placeholder="Поиск по нику" autocomplete="off"><button class="s" id="out">Выйти</button></div><div id="list"></div></aside>
+<section id="pane">
+<div class="hd"><button class="back" id="back">‹</button><div id="hav"></div><div><div class="t" id="ht"></div><div class="mu" id="hs"></div></div></div>
+<main id="main"></main>
+<div id="emo" hidden></div>
+<footer id="comp"><div class="box"><button id="emb" title="Эмодзи">☺</button><input id="inp" placeholder="Написать сообщение…" maxlength="1000" autocomplete="off"></div><button id="send" title="Отправить"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M3 20.5v-6.8l11-1.7-11-1.7V3.5L22 12z"/></svg></button></footer>
+</section>
+</div>
+<script>
+const S={view:"chat",open:false,q:"",msgs:[],dms:[],read:{},gifts:[],members:[],recv:{},nick:{},me:null,owner:false,auth:"load",mode:"login",err:"",form:{emoji:"🎁",name:"",to:"",gift:""}};
+const $=s=>document.querySelector(s);
+function el(t,c,x){const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e}
+function nm(id){return S.nick[id]||"Участник"}
+function ini(id){const n=S.nick[id];return n?n[0].toUpperCase():"?"}
+function tm(ts){try{return new Date(ts).toLocaleTimeString("ru",{hour:"2-digit",minute:"2-digit"})}catch(e){return""}}
+function dy(ts){const d=new Date(ts),n=new Date(),y=new Date(n-864e5);if(d.toDateString()===n.toDateString())return"Сегодня";if(d.toDateString()===y.toDateString())return"Вчера";return d.toLocaleDateString("ru",{day:"numeric",month:"long"})}
+function pl(n,a,b,c){const m=n%10,h=n%100;return n+" "+(m==1&&h!=11?a:(m>=2&&m<=4&&(h<12||h>14)?b:c))}
+function hs(s){let h=0;for(const c of String(s))h=(h*31+c.charCodeAt(0))>>>0;return h}
+function av(id,txt,sm,bg){const d=el("div","av"+(sm?" s":""),txt);d.style.background=bg||`hsl(${hs(id)%360} 50% 48%)`;return d}
+const ls={get:k=>{try{return localStorage.getItem(k)||""}catch(e){return""}},set:(k,v)=>{try{v?localStorage.setItem(k,v):localStorage.removeItem(k)}catch(e){}}};
+const isApp=!!window.Capacitor;
+let BASE=ls.get("srv")||(isApp?"":location.origin),TOKEN=ls.get("tok"),es=null;
+async function api(p,b){
+  const r=await fetch(BASE+p,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...b,token:TOKEN})});
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok){const e=new Error(j.error||("Ошибка "+r.status));e.status=r.status;throw e}
+  return j;
+}
+function thread(u){return S.dms.filter(m=>m.from===u||m.to===u)}
+function unread(u){const r=S.read[u]||0;return S.dms.filter(m=>m.from===u&&m.ts>r).length}
+function side(){
+  const l=$("#list");l.textContent="";
+  const last=S.msgs[S.msgs.length-1],mine=(S.recv[S.me]||[]).length;
+  let pv="Нет сообщений";
+  if(last)pv=last.type==="gift"?"🎁 "+last.gname:(last.uid===S.me?"Вы: ":nm(last.uid)+": ")+(last.text||"");
+  const sys=[{k:"chat",c:"#3390ec",ic:"💬",t:"Общий чат",pv,tm:last?tm(last.ts):""},{k:"gifts",c:"#e17076",ic:"🎁",t:"Мои подарки",pv:pl(mine,"подарок","подарка","подарков")}];
+  if(S.owner)sys.push({k:"admin",c:"#7bc862",ic:"⚙",t:"Админ",pv:"Выпуск и вручение подарков"});
+  const q=S.q.trim().toLowerCase();let n=0;
+  const add=i=>{
+    n++;const d=el("div","it"+(S.view===i.k?" on":""));
+    d.appendChild(i.uid?av(i.uid,ini(i.uid)):av(i.k,i.ic,0,i.c));
+    const b=el("div","b"),r=el("div","r");r.appendChild(el("div","t",i.t));r.appendChild(el("div","mu",i.tm||""));b.appendChild(r);
+    const r2=el("div","r");r2.appendChild(el("div","mu pv",i.pv));if(i.un&&S.view!==i.k)r2.appendChild(el("div","bd2",String(i.un)));
+    b.appendChild(r2);d.appendChild(b);
+    d.onclick=()=>{S.view=i.k;S.open=true;if(i.uid){S.q="";$("#q").value=""}render(true)};l.appendChild(d);
+  };
+  sys.filter(i=>!q||i.t.toLowerCase().includes(q)).forEach(add);
+  const dial={};S.dms.forEach(m=>{const o=m.from===S.me?m.to:m.from;if(!dial[o]||m.ts>=dial[o].ts)dial[o]=m});
+  const U=id=>{const d=dial[id];return{k:"dm:"+id,uid:id,t:nm(id),pv:d?(d.from===S.me?"Вы: ":"")+d.text:"Написать сообщение",tm:d?tm(d.ts):"",un:unread(id)}};
+  if(!q){Object.keys(dial).sort((a,b)=>dial[b].ts-dial[a].ts).forEach(id=>add(U(id)))}
+  else{
+    const f=S.members.filter(id=>id!==S.me&&nm(id).toLowerCase().includes(q));
+    if(f.length){l.appendChild(el("div","sec","Пользователи"));f.forEach(id=>add(U(id)))}
+    if(!n)l.appendChild(el("div","sec","Никого не найдено"));
+  }
+}
+function head(){
+  let T;if(S.view.startsWith("dm:")){const id=S.view.slice(3);T=[ini(id),`hsl(${hs(id)%360} 50% 48%)`,nm(id),"личные сообщения"]}else T={chat:["💬","#3390ec","Общий чат",pl(S.members.length,"участник","участника","участников")],gifts:["🎁","#e17076","Мои подарки","Каталог и коллекция"],admin:["⚙","#7bc862","Админ","Только для владельца"]}[S.view];
+  const a=$("#hav");a.textContent="";a.appendChild(av("h",T[0],1,T[1]));$("#ht").textContent=T[2];$("#hs").textContent=T[3];
+}
+function chat(m,list,dm){
+  if(S.err)m.appendChild(el("div","note",S.err));
+  if(!list.length)m.appendChild(el("div","note",dm?"Диалог пока пуст. Напишите первым!":"Пока пусто. Напишите первое сообщение!"));
+  let pd="",pu=null;
+  list.forEach(x=>{
+    const d=dy(x.ts);if(d!==pd){const s=el("div","sep");s.appendChild(el("span","",d));m.appendChild(s);pd=d;pu=null}
+    const me=x.uid===S.me,r=el("div","row"+(me?" me":""));
+    if(!me&&!dm)r.appendChild(pu===x.uid&&x.type!=="gift"?el("div","av s"):av(x.uid,ini(x.uid),1));
+    const b=el("div","bub");
+    if(!me&&!dm&&pu!==x.uid)b.appendChild(el("div","who",nm(x.uid)));
+    if(x.type==="gift"){b.classList.add("gift");b.appendChild(el("div","e",x.emoji||"🎁"));b.appendChild(el("div","",nm(x.uid)+" дарит «"+(x.gname||"")+"» · "+nm(x.to)))}
+    else b.appendChild(el("span","",x.text||""));
+    b.appendChild(el("span","ts",tm(x.ts)+(me?" ✓✓":"")));
+    r.appendChild(b);m.appendChild(r);pu=x.uid;
+  });
+}
+function giftsTab(m){
+  const mine=S.recv[S.me]||[];
+  const c=el("div","card");c.appendChild(el("h2","","Мои подарки ("+mine.length+")"));
+  const g=el("div","grid");
+  mine.forEach(i=>{const d=el("div","g");d.appendChild(el("div","e",i.emoji));d.appendChild(el("div","",i.name));d.appendChild(el("div","mu","от "+nm(i.from)));g.appendChild(d)});
+  if(!mine.length)c.appendChild(el("div","note","Пока нет подарков. Их выпускает и дарит владелец."));else c.appendChild(g);
+  m.appendChild(c);
+  const c2=el("div","card");c2.appendChild(el("h2","","Каталог подарков"));
+  const g2=el("div","grid");
+  S.gifts.forEach(i=>{const d=el("div","g");d.appendChild(el("div","e",i.emoji));d.appendChild(el("div","",i.name));g2.appendChild(d)});
+  if(!S.gifts.length)c2.appendChild(el("div","note","Каталог пуст."));else c2.appendChild(g2);
+  m.appendChild(c2);
+}
+function inp(ph,key,w){const i=el("input","f");i.placeholder=ph;i.value=S.form[key];i.oninput=()=>S.form[key]=i.value;if(w)i.maxLength=w;return i}
+function sel(key,opts,ph){const s=el("select");s.appendChild(new Option(ph,""));opts.forEach(([v,l])=>s.appendChild(new Option(l,v)));s.value=S.form[key];s.onchange=()=>S.form[key]=s.value;return s}
+function fail(e){if(e.status===401)return logout();S.err=e.message||"Ошибка";render()}
+function admin(m){
+  const c=el("div","card");c.appendChild(el("h2","","Выпустить новый подарок"));
+  const f=el("div","fr");f.appendChild(inp("Эмодзи","emoji",8));f.appendChild(inp("Название","name",30));
+  const b=el("button","p","Выпустить");b.onclick=addGift;f.appendChild(b);c.appendChild(f);m.appendChild(c);
+  const c2=el("div","card");c2.appendChild(el("h2","","Подарить участнику"));
+  const f2=el("div","fr");
+  f2.appendChild(sel("to",S.members.map(i=>[i,nm(i)+(i===S.me?" (вы)":"")]),"Кому"));
+  f2.appendChild(sel("gift",S.gifts.map(i=>[i.id,i.emoji+" "+i.name]),"Что"));
+  const b2=el("button","p","Подарить");b2.onclick=sendGift;f2.appendChild(b2);c2.appendChild(f2);m.appendChild(c2);
+  const c3=el("div","card");c3.appendChild(el("h2","","Каталог"));
+  S.gifts.forEach(i=>{const r=el("div","fr");r.appendChild(el("div","",i.emoji+" "+i.name));const d=el("button","s","удалить");d.onclick=()=>api("/api/gifts/delete",{id:i.id}).catch(fail);r.appendChild(d);c3.appendChild(r)});
+  if(!S.gifts.length)c3.appendChild(el("div","note","Пока нет подарков."));
+  m.appendChild(c3);
+}
+let first=true;
+function render(force){
+  if(S.auth!=="ok")return;
+  const dmv=S.view.startsWith("dm:"),peer=dmv?S.view.slice(3):null,th=dmv?thread(peer):[];
+  if(dmv&&th.length){const lt=th[th.length-1].ts;if((S.read[peer]||0)<lt){S.read[peer]=lt;ls.set("rd:"+S.me,JSON.stringify(S.read))}}
+  $("#app").classList.toggle("open",S.open);
+  side();head();
+  $("#comp").hidden=!(S.view==="chat"||dmv);
+  if(!(S.view==="chat"||dmv))$("#emo").hidden=true;
+  const m=$("#main"),near=m.scrollHeight-m.scrollTop-m.clientHeight<80;
+  m.textContent="";
+  if(S.view==="chat")chat(m,S.msgs,false);
+  else if(dmv)chat(m,th.map(x=>({uid:x.from,type:"text",text:x.text,ts:x.ts})),true);
+  else if(S.view==="gifts")giftsTab(m);else admin(m);
+  if((S.view==="chat"||dmv)&&(near||first||force))m.scrollTop=m.scrollHeight;
+  first=false;
+}
+async function send(){
+  const i=$("#inp"),t=i.value.trim();if(!t||S.auth!=="ok")return;i.value="";
+  const dmv=S.view.startsWith("dm:");
+  try{await api(dmv?"/api/dm":"/api/send",dmv?{to:S.view.slice(3),text:t}:{text:t})}catch(e){fail(e)}
+}
+async function addGift(){
+  const e=S.form.emoji.trim(),n=S.form.name.trim();if(!e||!n)return;
+  try{await api("/api/gifts",{emoji:e,name:n});S.form.name="";S.err=""}catch(x){return fail(x)}render();
+}
+async function sendGift(){
+  if(!S.form.gift||!S.form.to)return;
+  try{await api("/api/give",{giftId:S.form.gift,to:S.form.to});S.form.gift="";S.view="chat";S.err=""}catch(x){return fail(x)}
+  render(true);
+}
+/* ---- подключение к серверу ---- */
+function connect(){
+  if(es)es.close();
+  es=new EventSource(BASE+"/api/events?token="+encodeURIComponent(TOKEN));
+  const on=(n,f)=>es.addEventListener(n,e=>f(JSON.parse(e.data)));
+  on("init",d=>{S.me=d.me.id;S.owner=d.me.owner;S.nick={};S.members=d.members.map(m=>{S.nick[m.id]=m.nick;return m.id});S.gifts=d.gifts;S.recv=d.received;S.msgs=d.messages;S.dms=d.dms||[];try{S.read=JSON.parse(ls.get("rd:"+S.me)||"{}")}catch(e){S.read={}}S.err="";S.auth="ok";showAuth();render(true)});
+  on("msg",m=>{S.msgs.push(m);if(S.msgs.length>300)S.msgs.shift();render()});
+  on("dm",m=>{S.dms.push(m);render()});
+  on("member",m=>{if(!S.nick[m.id])S.members.push(m.id);S.nick[m.id]=m.nick;render()});
+  on("gift",g=>{S.gifts.push(g);render()});
+  on("giftdel",d=>{S.gifts=S.gifts.filter(g=>g.id!==d.id);render()});
+  on("received",d=>{(S.recv[d.to]=S.recv[d.to]||[]).push(d.item);render()});
+  es.onerror=async()=>{
+    try{const r=await fetch(BASE+"/api/me?token="+encodeURIComponent(TOKEN));if(r.status===401)return logout()}
+    catch(e){}
+    S.err="Нет связи с сервером. Переподключаюсь…";
+    if(S.auth==="ok")render();else showAuth();
+  };
+}
+function logout(){
+  if(es){es.close();es=null}
+  if(TOKEN)fetch(BASE+"/api/logout",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token:TOKEN})}).catch(()=>{});
+  TOKEN="";ls.set("tok","");S.auth="login";S.err="";S.msgs=[];S.dms=[];S.view="chat";first=true;showAuth();
+}
+/* ---- экраны входа ---- */
+function field(ph,type,id){const i=el("input","f");i.placeholder=ph;i.type=type||"text";i.id=id;i.autocomplete="off";i.autocapitalize="off";return i}
+function aerr(t){const e=$("#aerr");if(e)e.textContent=t||""}
+function showAuth(){
+  const a=$("#auth");
+  if(S.auth==="ok"){a.hidden=true;return}
+  a.hidden=false;a.textContent="";const c=el("div","ac");a.appendChild(c);
+  const srv=()=>{const b=el("button","s","Сервер: "+(BASE||"не задан")+" (сменить)");b.onclick=()=>{S.auth="setup";showAuth()};c.appendChild(b)};
+  if(S.auth==="load"){c.appendChild(el("p","mu",S.err||"Подключение…"));srv();return}
+  if(S.auth==="setup"){
+    c.appendChild(el("h1","","Сервер"));
+    c.appendChild(el("p","mu","Адрес вашего сервера, например https://chat.example.com"));
+    const f=field("https://…","url","su");f.value=BASE;c.appendChild(f);
+    c.appendChild(el("div","err","")).id="aerr";
+    const b=el("button","p","Продолжить");c.appendChild(b);
+    const go=async()=>{
+      let u=f.value.trim().replace(/\/+$/,"");if(!u)return;if(!/^https?:\/\//.test(u))u="http://"+u;
+      aerr("Проверяю…");
+      try{const r=await fetch(u+"/api/ping");if(!r.ok)throw 0;BASE=u;ls.set("srv",u);aerr("");boot()}
+      catch(e){aerr("Сервер не отвечает по этому адресу")}
+    };
+    b.onclick=go;f.onkeydown=e=>{if(e.key==="Enter")go()};return;
+  }
+  const reg=S.auth==="register";
+  c.appendChild(el("h1","","Turbogram"));c.appendChild(el("p","mu",reg?"Регистрация":"Вход"));
+  const n=field("Ник","text","an"),p=field("Пароль","password","ap");c.appendChild(n);c.appendChild(p);
+  let p2;if(reg){p2=field("Повторите пароль","password","ap2");c.appendChild(p2)}
+  c.appendChild(el("div","err","")).id="aerr";
+  const b=el("button","p",reg?"Зарегистрироваться":"Войти");c.appendChild(b);
+  const sw=el("button","s",reg?"Уже есть аккаунт? Войти":"Нет аккаунта? Зарегистрироваться");sw.onclick=()=>{S.auth=reg?"login":"register";showAuth()};c.appendChild(sw);
+  if(reg)c.appendChild(el("p","mu","Ник уникален: занятый ник другой пользователь взять не сможет."));
+  srv();
+  const go=async()=>{
+    const nick=n.value.trim(),pw=p.value;
+    if(!nick||!pw)return aerr("Введите ник и пароль");
+    if(reg&&pw!==p2.value)return aerr("Пароли не совпадают");
+    aerr("…");
+    try{const r=await api(reg?"/api/register":"/api/login",{nick,password:pw});TOKEN=r.token;ls.set("tok",TOKEN);S.auth="load";S.err="";showAuth();connect()}
+    catch(e){aerr(e.message==="Failed to fetch"?"Нет связи с сервером":e.message)}
+  };
+  b.onclick=go;c.querySelectorAll("input").forEach(i=>i.onkeydown=e=>{if(e.key==="Enter")go()});
+}
+function boot(){
+  if(!BASE){S.auth="setup";showAuth();return}
+  if(!TOKEN){S.auth="login";showAuth();return}
+  S.auth="load";showAuth();connect();
+}
+const E=["😀","😂","😍","👍","🙏","🔥","🎉","❤️","😎","🤔","😢","🎁"];
+E.forEach(e=>{const s=el("span","",e);s.onclick=()=>{$("#inp").value+=e;$("#inp").focus()};$("#emo").appendChild(s)});
+$("#emb").onclick=()=>{$("#emo").hidden=!$("#emo").hidden};
+$("#send").onclick=send;
+$("#inp").onkeydown=e=>{if(e.key==="Enter")send()};
+$("#q").oninput=e=>{S.q=e.target.value;side()};
+$("#back").onclick=()=>{S.open=false;render()};
+$("#out").onclick=logout;
+boot();
+</script>
+</body>
+</html>
