@@ -18,6 +18,8 @@ jobs:
       - name: Prepare Android project
         working-directory: app
         run: |
+          mkdir -p www
+          cp -f *.html *.webmanifest *.svg www/ 2>/dev/null || true
           npm install
           npx cap add android
           npx cap sync android
