@@ -31,10 +31,24 @@ function broadcast(ev, data) { const m = frame(ev, data); for (const c of client
 function toUsers(ev, data, ids) { const m = frame(ev, data); for (const c of clients) if (ids.includes(c.uid)) c.res.write(m); }
 
 /* ---------- хранилище (Supabase) ---------- */
+const MSG_COLS = 'id,uid,type,text,to_uid,emoji,gname,ts,reply_to,reply_uid,reply_text';
+const DM_COLS = 'id,from_uid,to_uid,text,ts,reply_to,reply_uid,reply_text';
+const rp = r => r.reply_to ? { id: r.reply_to, uid: r.reply_uid, text: r.reply_text } : undefined;
 const outMsg = r => r.type === 'gift'
-  ? { id: r.id, uid: r.uid, type: 'gift', to: r.to_uid, emoji: r.emoji, gname: r.gname, ts: r.ts }
-  : { id: r.id, uid: r.uid, type: 'text', text: r.text, ts: r.ts };
-const outDm = r => ({ id: r.id, from: r.from_uid, to: r.to_uid, text: r.text, ts: r.ts });
+  ? { id: r.id, uid: r.uid, type: 'gift', to: r.to_uid, emoji: r.emoji, gname: r.gname, ts: r.ts, reply: rp(r) }
+  : { id: r.id, uid: r.uid, type: 'text', text: r.text, ts: r.ts, reply: rp(r) };
+const outDm = r => ({ id: r.id, from: r.from_uid, to: r.to_uid, text: r.text, ts: r.ts, reply: rp(r) });
+// Цитата строится на сервере по исходному сообщению, клиенту не доверяем
+const snip = (t, n = 100) => String(t || '').slice(0, n);
+async function replyOfMsg(id) {
+  const o = await run(sb.from('messages').select('id,uid,type,text,gname').eq('id', id).maybeSingle());
+  return o ? { reply_to: o.id, reply_uid: o.uid, reply_text: o.type === 'gift' ? '🎁 ' + (o.gname || '') : snip(o.text) } : null;
+}
+async function replyOfDm(id, a, b) {
+  const o = await run(sb.from('dms').select('id,from_uid,to_uid,text').eq('id', id).maybeSingle());
+  const ok = o && ((o.from_uid === a && o.to_uid === b) || (o.from_uid === b && o.to_uid === a));
+  return ok ? { reply_to: o.id, reply_uid: o.from_uid, reply_text: snip(o.text) } : null;
+}
 const outRecv = r => ({ emoji: r.emoji, name: r.name, from: r.from_uid, ts: r.ts });
 
 let ownerCache = null;
@@ -68,8 +82,8 @@ async function initData(u) {
     run(sb.from('users').select('id,nick').order('created_at', { ascending: true }).limit(5000)),
     run(sb.from('gifts').select('id,emoji,name,ts').order('ts', { ascending: true })),
     run(sb.from('received').select('user_id,emoji,name,from_uid,ts').order('ts', { ascending: true })),
-    run(sb.from('messages').select('id,uid,type,text,to_uid,emoji,gname,ts').order('ts', { ascending: false }).limit(200)),
-    run(sb.from('dms').select('id,from_uid,to_uid,text,ts').or('from_uid.eq.' + u.id + ',to_uid.eq.' + u.id).order('ts', { ascending: false }).limit(500))
+    run(sb.from('messages').select(MSG_COLS).order('ts', { ascending: false }).limit(200)),
+    run(sb.from('dms').select(DM_COLS).or('from_uid.eq.' + u.id + ',to_uid.eq.' + u.id).order('ts', { ascending: false }).limit(500))
   ]);
   const received = {};
   recv.forEach(r => (received[r.user_id] = received[r.user_id] || []).push(outRecv(r)));
@@ -153,7 +167,13 @@ async function api(req, res, url) {
   }
   if (p === '/api/send') {
     const text = clean(b.text, 1000); if (!text) return send(res, 400, { error: 'Пустое сообщение' });
-    const r = await run(sb.from('messages').insert({ uid: u.id, type: 'text', text, ts: Date.now() }).select('id,uid,type,text,ts').single());
+    let rep = {};
+    if (b.reply != null) {
+      if (!UUID.test(String(b.reply))) return send(res, 400, { error: 'Исходное сообщение удалено' });
+      rep = await replyOfMsg(b.reply);
+      if (!rep) return send(res, 400, { error: 'Исходное сообщение удалено' });
+    }
+    const r = await run(sb.from('messages').insert({ uid: u.id, type: 'text', text, ts: Date.now(), ...rep }).select(MSG_COLS).single());
     broadcast('msg', outMsg(r));
     return send(res, 200, { ok: true });
   }
@@ -163,8 +183,30 @@ async function api(req, res, url) {
     if (!text) return send(res, 400, { error: 'Пустое сообщение' });
     const to = await run(sb.from('users').select('id').eq('id', b.to).maybeSingle());
     if (!to) return send(res, 400, { error: 'Пользователь не найден' });
-    const r = await run(sb.from('dms').insert({ from_uid: u.id, to_uid: to.id, text, ts: Date.now() }).select('id,from_uid,to_uid,text,ts').single());
+    let rep = {};
+    if (b.reply != null) {
+      if (!UUID.test(String(b.reply))) return send(res, 400, { error: 'Исходное сообщение удалено' });
+      rep = await replyOfDm(b.reply, u.id, to.id);
+      if (!rep) return send(res, 400, { error: 'Исходное сообщение удалено' });
+    }
+    const r = await run(sb.from('dms').insert({ from_uid: u.id, to_uid: to.id, text, ts: Date.now(), ...rep }).select(DM_COLS).single());
     toUsers('dm', outDm(r), [u.id, to.id]);
+    return send(res, 200, { ok: true });
+  }
+
+  if (p === '/api/delete') {
+    const dm = b.kind === 'dm';
+    if (!dm && b.kind !== 'msg') return send(res, 400, { error: 'Некорректный запрос' });
+    if (!UUID.test(String(b.id))) return send(res, 404, { error: 'Сообщение уже удалено' });
+    const t = dm ? 'dms' : 'messages';
+    const row = await run(sb.from(t).select(dm ? 'id,from_uid,to_uid' : 'id,uid').eq('id', b.id).maybeSingle());
+    if (!row) return send(res, 404, { error: 'Сообщение уже удалено' });
+    const author = dm ? row.from_uid : row.uid;
+    // удалять может автор сообщения или владелец
+    if (author !== u.id && (await ownerId()) !== u.id) return send(res, 403, { error: 'Можно удалять только свои сообщения' });
+    await run(sb.from(t).delete().eq('id', b.id));
+    const ev = { kind: dm ? 'dm' : 'msg', id: b.id };
+    if (dm) toUsers('del', ev, [row.from_uid, row.to_uid]); else broadcast('del', ev);
     return send(res, 200, { ok: true });
   }
 
@@ -179,44 +221,4 @@ async function api(req, res, url) {
   if (p === '/api/gifts/delete') {
     if (!UUID.test(String(b.id))) return send(res, 400, { error: 'Нет такого подарка' });
     await run(sb.from('gifts').delete().eq('id', b.id));
-    broadcast('giftdel', { id: b.id });
-    return send(res, 200, { ok: true });
-  }
-  if (p === '/api/give') {
-    if (!UUID.test(String(b.giftId)) || !UUID.test(String(b.to))) return send(res, 400, { error: 'Нет такого подарка или участника' });
-    const g = await run(sb.from('gifts').select('id,emoji,name').eq('id', b.giftId).maybeSingle());
-    const to = await run(sb.from('users').select('id').eq('id', b.to).maybeSingle());
-    if (!g || !to) return send(res, 400, { error: 'Нет такого подарка или участника' });
-    const ts = Date.now();
-    await run(sb.from('received').insert({ user_id: to.id, emoji: g.emoji, name: g.name, from_uid: u.id, ts }));
-    const m = await run(sb.from('messages').insert({ uid: u.id, type: 'gift', to_uid: to.id, emoji: g.emoji, gname: g.name, ts }).select('id,uid,type,text,to_uid,emoji,gname,ts').single());
-    broadcast('received', { to: to.id, item: { emoji: g.emoji, name: g.name, from: u.id, ts } });
-    broadcast('msg', outMsg(m));
-    return send(res, 200, { ok: true });
-  }
-  return send(res, 404, { error: 'Не найдено' });
-}
-
-const TYPES = { '.html': 'text/html; charset=utf-8', '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml', '.js': 'text/javascript', '.png': 'image/png' };
-http.createServer(async (req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-  if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
-  const url = new URL(req.url, 'http://x');
-  try {
-    if (url.pathname.startsWith('/api/')) return await api(req, res, url);
-    const f = path.normalize(path.join(WWW, url.pathname === '/' ? 'index.html' : url.pathname));
-    if (!f.startsWith(WWW) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { res.writeHead(404); return res.end('Not found'); }
-    res.writeHead(200, { 'Content-Type': TYPES[path.extname(f)] || 'application/octet-stream' });
-    fs.createReadStream(f).pipe(res);
-  } catch (e) {
-    if (!e.bad) console.error(e);
-    if (!res.headersSent) send(res, e.bad ? 400 : 500, { error: e.bad ? 'Некорректный запрос' : 'Ошибка сервера, попробуйте позже' });
-  }
-}).listen(PORT, () => {
-  console.log('Turbogram запущен: http://localhost:' + PORT);
-  // чистим сессии старше 90 дней
-  sb.from('sessions').delete().lt('created_at', new Date(Date.now() - 90 * 864e5).toISOString())
-    .then(() => {}, () => {});
-});
+    broadcast('giftdel', { id: b.id })
