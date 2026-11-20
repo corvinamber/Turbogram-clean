@@ -221,4 +221,44 @@ async function api(req, res, url) {
   if (p === '/api/gifts/delete') {
     if (!UUID.test(String(b.id))) return send(res, 400, { error: 'Нет такого подарка' });
     await run(sb.from('gifts').delete().eq('id', b.id));
-    broadcast('giftdel', { id: b.id })
+    broadcast('giftdel', { id: b.id });
+    return send(res, 200, { ok: true });
+  }
+  if (p === '/api/give') {
+    if (!UUID.test(String(b.giftId)) || !UUID.test(String(b.to))) return send(res, 400, { error: 'Нет такого подарка или участника' });
+    const g = await run(sb.from('gifts').select('id,emoji,name').eq('id', b.giftId).maybeSingle());
+    const to = await run(sb.from('users').select('id').eq('id', b.to).maybeSingle());
+    if (!g || !to) return send(res, 400, { error: 'Нет такого подарка или участника' });
+    const ts = Date.now();
+    await run(sb.from('received').insert({ user_id: to.id, emoji: g.emoji, name: g.name, from_uid: u.id, ts }));
+    const m = await run(sb.from('messages').insert({ uid: u.id, type: 'gift', to_uid: to.id, emoji: g.emoji, gname: g.name, ts }).select(MSG_COLS).single());
+    broadcast('received', { to: to.id, item: { emoji: g.emoji, name: g.name, from: u.id, ts } });
+    broadcast('msg', outMsg(m));
+    return send(res, 200, { ok: true });
+  }
+  return send(res, 404, { error: 'Не найдено' });
+}
+
+const TYPES = { '.html': 'text/html; charset=utf-8', '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml', '.js': 'text/javascript', '.png': 'image/png' };
+http.createServer(async (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
+  const url = new URL(req.url, 'http://x');
+  try {
+    if (url.pathname.startsWith('/api/')) return await api(req, res, url);
+    const f = path.normalize(path.join(WWW, url.pathname === '/' ? 'index.html' : url.pathname));
+    if (!f.startsWith(WWW) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { res.writeHead(404); return res.end('Not found'); }
+    res.writeHead(200, { 'Content-Type': TYPES[path.extname(f)] || 'application/octet-stream' });
+    fs.createReadStream(f).pipe(res);
+  } catch (e) {
+    if (!e.bad) console.error(e);
+    if (!res.headersSent) send(res, e.bad ? 400 : 500, { error: e.bad ? 'Некорректный запрос' : 'Ошибка сервера, попробуйте позже' });
+  }
+}).listen(PORT, () => {
+  console.log('Turbogram запущен: http://localhost:' + PORT);
+  // чистим сессии старше 90 дней
+  sb.from('sessions').delete().lt('created_at', new Date(Date.now() - 90 * 864e5).toISOString())
+    .then(() => {}, () => {});
+});
