@@ -1,1 +1,8 @@
-{"name":"turbogram-server","version":"1.0.0","private":true,"scripts":{"start":"node server.js"},"engines":{"node":">=18"}}
+{
+  "name": "turbogram-server",
+  "version": "2.0.0",
+  "private": true,
+  "scripts": { "start": "node server.js" },
+  "dependencies": { "@supabase/supabase-js": "^2.45.0" },
+  "engines": { "node": ">=18" }
+}
