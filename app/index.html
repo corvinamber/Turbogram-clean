@@ -99,6 +99,24 @@ button.s{background:none;border:0;color:var(--mu);cursor:pointer;font-size:12px;
 .sheet textarea{resize:none;height:84px}
 .sheet .fr{margin:0}.err{color:#e5484d;font-size:13px;min-height:16px}.ok{color:#3aa655;font-size:13px}
 button.p.w{width:100%}button.g2{background:var(--hov);color:var(--tx);border:0;border-radius:10px;padding:9px 16px;font:inherit;cursor:pointer}
+.gc{background:linear-gradient(135deg,#7c6cf022,#ff7eb322);border:1px solid var(--bd);border-radius:14px;padding:12px 14px;text-align:center}
+.gc .e{font-size:54px;line-height:1.1}.gc .gn{font-weight:700;margin-top:2px}.gc .gm{color:var(--mu);font-size:13px;margin-top:2px}
+.gc .gnote{font-style:italic;margin-top:6px;font-size:14px}.gc .gfrom{font-size:11px;color:var(--mu);margin-top:4px}
+.bub.gift2{padding:8px;min-width:210px}.gift2 .gh{font-size:13px;margin:2px 4px 6px}
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px}
+.pgrid .gc{padding:8px}.pgrid .gc .e{font-size:34px}.pgrid .gc .gn{font-size:13px}
+.shopgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;max-width:640px;margin:0 auto 12px}
+.sg{background:var(--pan);border-radius:14px;padding:12px;text-align:center;display:flex;flex-direction:column;gap:4px}
+.sg .e{font-size:46px;line-height:1.1}.sg .gn{font-weight:600}.sg .pr{font-weight:700}
+.sg .lf{font-size:13px;color:var(--mu)}.sg .lf.low{color:#e5484d}.sg button{margin-top:auto}.sg.out{opacity:.65}
+.bal{font-size:15px;margin-bottom:8px}.bal b{font-size:20px}
+.dbal{font-size:15px;font-weight:600;margin-top:2px}
+.fld{margin:6px 0}.fld label{display:block;font-size:13px;color:var(--mu);margin-bottom:3px}
+.fld input,.fld select{width:100%;box-sizing:border-box}
+label.chk{display:flex;align-items:center;gap:8px;font-size:14px;margin-top:6px;color:var(--tx)}
+button.p:disabled{opacity:.5;cursor:default}
+.crow{display:flex;gap:8px;align-items:center;margin:4px 0;font-size:14px}.crow .t{flex:1;min-width:0}.crow .mu{font-size:12px}
+.fr>.fld{flex:1 1 120px;margin:0}
 [hidden]{display:none!important}
 @media(max-width:720px){#side{width:100%;border:0}#pane{display:none}#app.open #side{display:none}#app.open #pane{display:flex}.hd .back{display:block}}
 </style>
@@ -120,7 +138,7 @@ button.p.w{width:100%}button.g2{background:var(--hov);color:var(--tx);border:0;b
 <div id="sov" hidden><div class="sheet" id="sheet"></div></div>
 <div class="menu" id="menu" hidden></div><div class="toast" id="toast" hidden></div>
 <script>
-const S={preview:false,U:{},view:"chat",open:false,q:"",reply:null,msgs:[],dms:[],read:{},gifts:[],members:[],recv:{},nick:{},me:null,owner:false,auth:"load",mode:"login",err:"",form:{emoji:"🎁",name:"",to:"",gift:""}};
+const S={coins:0,lastDaily:0,armed:"",dirty:false,preview:false,U:{},view:"chat",open:false,q:"",reply:null,msgs:[],dms:[],read:{},gifts:[],members:[],recv:{},nick:{},me:null,owner:false,auth:"load",mode:"login",err:"",form:{emoji:"🎁",name:"",price:"",supply:"",cnick:"",camt:"",to:"",note:"",free:false}};
 const $=s=>document.querySelector(s);
 function el(t,c,x){const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e}
 function nm(id){return S.nick[id]||"Участник"}
@@ -141,7 +159,7 @@ let BASE=ls.get("srv")||(isApp?"":location.origin),TOKEN=ls.get("tok"),es=null;
 async function api(p,b){
   const r=await fetch(BASE+p,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...b,token:TOKEN})});
   const j=await r.json().catch(()=>({}));
-  if(!r.ok){const e=new Error(j.error||("Ошибка "+r.status));e.status=r.status;throw e}
+  if(!r.ok){const e=new Error(j.error||("Ошибка "+r.status));e.status=r.status;e.data=j;throw e}
   return j;
 }
 function thread(u){return S.dms.filter(m=>m.from===u||m.to===u)}
@@ -151,8 +169,8 @@ function side(){
   const last=S.msgs[S.msgs.length-1],mine=(S.recv[S.me]||[]).length;
   let pv="Нет сообщений";
   if(last)pv=last.type==="gift"?"🎁 "+last.gname:(last.uid===S.me?"Вы: ":nm(last.uid)+": ")+(last.text||"");
-  const sys=[{k:"chat",c:"#3390ec",ic:"💬",t:"Общий чат",pv,tm:last?tm(last.ts):""},{k:"gifts",c:"#e17076",ic:"🎁",t:"Мои подарки",pv:pl(mine,"подарок","подарка","подарков")}];
-  if(S.owner)sys.push({k:"admin",c:"#7bc862",ic:"⚙",t:"Админ",pv:"Выпуск и вручение подарков"});
+  const sys=[{k:"chat",c:"#3390ec",ic:"💬",t:"Общий чат",pv,tm:last?tm(last.ts):""},{k:"shop",c:"#e17076",ic:"🎁",t:"Магазин подарков",pv:"Баланс: "+fmt(S.coins)+" 🪙"}];
+  if(S.owner)sys.push({k:"admin",c:"#7bc862",ic:"⚙",t:"Админ",pv:"Подарки и монеты"});
   const q=S.q.trim().toLowerCase();let n=0;
   const add=i=>{
     n++;const d=el("div","it"+(S.view===i.k?" on":""));
@@ -173,7 +191,7 @@ function side(){
   }
 }
 function head(){
-  let T;if(S.view.startsWith("dm:")){const id=S.view.slice(3);T=[ini(id),`hsl(${hs(id)%360} 50% 48%)`,nm(id),"личные сообщения"]}else T={chat:["💬","#3390ec","Общий чат",pl(S.members.length,"участник","участника","участников")],gifts:["🎁","#e17076","Мои подарки","Каталог и коллекция"],admin:["⚙","#7bc862","Админ","Только для владельца"]}[S.view];
+  let T;if(S.view.startsWith("dm:")){const id=S.view.slice(3);T=[ini(id),`hsl(${hs(id)%360} 50% 48%)`,nm(id),"личные сообщения"]}else T={chat:["💬","#3390ec","Общий чат",pl(S.members.length,"участник","участника","участников")],shop:["🎁","#e17076","Магазин подарков","Баланс: "+fmt(S.coins)+" 🪙"],admin:["⚙","#7bc862","Админ","Только для владельца"]}[S.view];
   const dmId=S.view.startsWith("dm:")?S.view.slice(3):null;
   const a=$("#hav");a.textContent="";a.appendChild(dmId?av(dmId,ini(dmId),1):av("h",T[0],1,T[1]));$("#ht").textContent=T[2];$("#hs").textContent=T[3];
   const hc=$("#hdc");hc.style.cursor=dmId?"pointer":"default";hc.onclick=dmId?()=>openProfile(dmId):null;
@@ -189,42 +207,133 @@ function chat(m,list,dm){
     const b=el("div","bub");
     if(!me&&!dm&&pu!==x.uid){const w=el("div","who",nm(x.uid));w.onclick=e=>{e.stopPropagation();openProfile(x.uid)};b.appendChild(w)}
     if(x.reply){const q=el("div","quote");q.appendChild(el("b","",x.reply.uid===S.me?"Вы":nm(x.reply.uid)));q.appendChild(el("span","",x.reply.text||"…"));q.onclick=e=>{e.stopPropagation();jump(x.reply.id)};b.appendChild(q)}
-    if(x.type==="gift"){b.classList.add("gift");b.appendChild(el("div","e",x.emoji||"🎁"));b.appendChild(el("div","",nm(x.uid)+" дарит «"+(x.gname||"")+"» · "+nm(x.to)))}
+    if(x.type==="giftcard"&&x.gift){b.classList.add("gift2");b.appendChild(el("div","gh",me?"🎁 Вы отправили подарок":"🎁 "+nm(x.uid)+" дарит вам подарок"));b.appendChild(gcard(x.gift))}
+    else if(x.type==="gift"){b.classList.add("gift");b.appendChild(el("div","e",x.emoji||"🎁"));b.appendChild(el("div","",nm(x.uid)+" дарит «"+(x.gname||"")+"» · "+nm(x.to)))}
     else b.appendChild(el("span","",x.text||""));
     b.appendChild(el("span","ts",tm(x.ts)+(me?" ✓✓":"")));
     b.onclick=e=>{e.stopPropagation();openMenu(x,dm,b)};r.appendChild(b);m.appendChild(r);pu=x.uid;
   });
 }
-function giftsTab(m){
-  const mine=S.recv[S.me]||[];
-  const c=el("div","card");c.appendChild(el("h2","","Мои подарки ("+mine.length+")"));
-  const g=el("div","grid");
-  mine.forEach(i=>{const d=el("div","g");d.appendChild(el("div","e",i.emoji));d.appendChild(el("div","",i.name));d.appendChild(el("div","mu","от "+nm(i.from)));g.appendChild(d)});
-  if(!mine.length)c.appendChild(el("div","note","Пока нет подарков. Их выпускает и дарит владелец."));else c.appendChild(g);
-  m.appendChild(c);
-  const c2=el("div","card");c2.appendChild(el("h2","","Каталог подарков"));
-  const g2=el("div","grid");
-  S.gifts.forEach(i=>{const d=el("div","g");d.appendChild(el("div","e",i.emoji));d.appendChild(el("div","",i.name));g2.appendChild(d)});
-  if(!S.gifts.length)c2.appendChild(el("div","note","Каталог пуст."));else c2.appendChild(g2);
-  m.appendChild(c2);
+const fmt=n=>Number(n||0).toLocaleString("ru");
+function sup(g){return g.supply>0?"Осталось: "+Math.max(0,g.supply-g.sold)+" из "+g.supply:"Без лимита"}
+function gcard(i){
+  const c=el("div","gc");c.appendChild(el("div","e",i.emoji));c.appendChild(el("div","gn",i.name));
+  const meta=[];if(i.price>0)meta.push(fmt(i.price)+" 🪙");if(i.serial)meta.push("#"+i.serial+(i.supply>0?" из "+i.supply:""));
+  if(meta.length)c.appendChild(el("div","gm",meta.join(" · ")));
+  if(i.note)c.appendChild(el("div","gnote","«"+i.note+"»"));
+  return c;
 }
-function inp(ph,key,w){const i=el("input","f");i.placeholder=ph;i.value=S.form[key];i.oninput=()=>S.form[key]=i.value;if(w)i.maxLength=w;return i}
-function sel(key,opts,ph){const s=el("select");s.appendChild(new Option(ph,""));opts.forEach(([v,l])=>s.appendChild(new Option(l,v)));s.value=S.form[key];s.onchange=()=>S.form[key]=s.value;return s}
-function fail(e){if(e.status===401)return logout();S.err=e.message||"Ошибка";render()}
+function inp(ph,key,w,num){const i=el("input","f");i.placeholder=ph;i.value=S.form[key];i.oninput=()=>S.form[key]=i.value;if(w)i.maxLength=w;if(num){i.type="number";i.min=0;i.inputMode="numeric"}return i}
+function sel(key,opts,ph){const s=el("select");s.appendChild(new Option(ph,""));opts.forEach(([v,l])=>s.appendChild(new Option(l,v)));s.value=S.form[key];s.onchange=()=>{S.form[key]=s.value;render(true)};return s}
+function fld(label,node){const d=el("div","fld");d.appendChild(el("label","",label));d.appendChild(node);return d}
+function fail(e){if(e.status===401)return logout();toast(e.message||"Ошибка");S.err="";render(true)}
+/* ежедневный бонус с обратным отсчётом */
+const dailyLeft=()=>Math.max(0,(S.lastDaily||0)+864e5-Date.now());
+function fmtT(ms){const s=Math.ceil(ms/1000);return [Math.floor(s/3600),Math.floor(s%3600/60),s%60].map(v=>String(v).padStart(2,"0")).join(":")}
+function updDaily(b){const l=dailyLeft();if(l>0){b.disabled=true;b.textContent="Следующий бонус через "+fmtT(l)}else{b.disabled=false;b.textContent="🎁 Забрать ежедневный бонус (+50 🪙)"}}
+function dailyBtn(){const b=el("button","p w");b.dataset.daily="1";b.onclick=claimDaily;updDaily(b);return b}
+setInterval(()=>document.querySelectorAll("[data-daily]").forEach(updDaily),1000);
+async function claimDaily(){
+  try{const r=await api("/api/daily",{});S.coins=r.coins;S.lastDaily=r.lastDaily;toast("+"+r.gained+" 🪙 Ежедневный бонус получен");refreshCoins()}
+  catch(e){if(e.status===429&&e.data){S.lastDaily=e.data.lastDaily||S.lastDaily;refreshCoins()}fail(e)}
+}
+function refreshCoins(){
+  render(true);
+  if(!$("#sov").hidden&&sheetMode==="view"&&sheetFor===S.me)openProfile(S.me);
+  if($("#drawer").classList.contains("on"))openDrawer();
+}
+function shop(m){
+  const top=el("div","card");top.appendChild(el("h2","","Магазин подарков"));
+  const bal=el("div","bal");bal.appendChild(document.createTextNode("Ваш баланс: "));bal.appendChild(el("b","",fmt(S.coins)+" 🪙"));top.appendChild(bal);
+  top.appendChild(dailyBtn());m.appendChild(top);
+  const c0=el("div","card");
+  c0.appendChild(fld("Кому отправить",sel("to",S.members.filter(i=>i!==S.me).map(i=>[i,nm(i)]),"Выберите получателя")));
+  c0.appendChild(fld("Подпись к подарку (необязательно)",inp("Например: с днём рождения!","note",80)));
+  if(S.owner){const l=el("label","chk"),c=el("input");c.type="checkbox";c.checked=!!S.form.free;c.onchange=()=>{S.form.free=c.checked;render(true)};l.appendChild(c);l.appendChild(document.createTextNode("Бесплатно (подарок от владельца)"));c0.appendChild(l)}
+  c0.appendChild(el("div","mu","Карточка подарка придёт получателю в личные сообщения."));
+  m.appendChild(c0);
+  if(!S.gifts.length)m.appendChild(el("div","note","Каталог пока пуст."));
+  const grid=el("div","shopgrid");
+  S.gifts.forEach(i=>{
+    const d=el("div","sg");d.appendChild(el("div","e",i.emoji));d.appendChild(el("div","gn",i.name));
+    d.appendChild(el("div","pr",i.price>0?fmt(i.price)+" 🪙":"Бесплатно"));
+    const left=i.supply>0?i.supply-i.sold:Infinity,out=left<=0,free=!!(S.owner&&S.form.free),short=!free&&S.coins<i.price;
+    d.appendChild(el("div","lf"+(i.supply>0&&!out&&left<=Math.max(1,Math.ceil(i.supply*.2))?" low":""),sup(i)));
+    const cost=free||!i.price?"":" −"+fmt(i.price)+" 🪙";
+    const b=el("button","p w",out?"Распродано":short?"Не хватает монет":!S.form.to?"Выберите получателя":S.armed===i.id?"Подтвердить"+cost:(free||!i.price?"Подарить":"Купить за "+fmt(i.price)+" 🪙"));
+    b.disabled=out||short||!S.form.to;if(out)d.classList.add("out");
+    b.onclick=()=>{
+      if(S.armed!==i.id){S.armed=i.id;setTimeout(()=>{if(S.armed===i.id){S.armed="";render(true)}},4000);render(true);return}
+      buy(i);
+    };
+    d.appendChild(b);grid.appendChild(d);
+  });
+  m.appendChild(grid);
+}
+let buying=false;
+async function buy(g){
+  if(buying)return;buying=true;S.armed="";
+  const to=S.form.to;
+  try{
+    const r=await api("/api/buy",{giftId:g.id,to,note:(S.form.note||"").trim(),free:!!(S.owner&&S.form.free)});
+    S.coins=r.coins;S.form.note="";toast("Подарок отправлен: "+g.emoji+" #"+r.serial+(r.supply>0?" из "+r.supply:""));
+    S.view="dm:"+to;S.open=true;render(true);   // показываем карточку в личном чате
+  }catch(e){fail(e)}
+  finally{buying=false}
+}
 function admin(m){
   const c=el("div","card");c.appendChild(el("h2","","Выпустить новый подарок"));
-  const f=el("div","fr");f.appendChild(inp("Эмодзи","emoji",8));f.appendChild(inp("Название","name",30));
-  const b=el("button","p","Выпустить");b.onclick=addGift;f.appendChild(b);c.appendChild(f);m.appendChild(c);
-  const c2=el("div","card");c2.appendChild(el("h2","","Подарить участнику"));
-  const f2=el("div","fr");
-  f2.appendChild(sel("to",S.members.map(i=>[i,nm(i)+(i===S.me?" (вы)":"")]),"Кому"));
-  f2.appendChild(sel("gift",S.gifts.map(i=>[i.id,i.emoji+" "+i.name]),"Что"));
-  const b2=el("button","p","Подарить");b2.onclick=sendGift;f2.appendChild(b2);c2.appendChild(f2);m.appendChild(c2);
+  const f=el("div","fr");
+  f.appendChild(fld("Эмодзи",inp("🎁","emoji",8)));f.appendChild(fld("Название",inp("Название","name",30)));
+  f.appendChild(fld("Цена, 🪙",inp("0","price",9,true)));
+  f.appendChild(fld("Лимит выпуска (тираж)",inp("пусто или 0 — без лимита","supply",9,true)));
+  c.appendChild(f);const b=el("button","p w","Выпустить");b.style.marginTop="8px";b.onclick=addGift;c.appendChild(b);m.appendChild(c);
   const c3=el("div","card");c3.appendChild(el("h2","","Каталог"));
-  S.gifts.forEach(i=>{const r=el("div","fr");r.appendChild(el("div","",i.emoji+" "+i.name));const d=el("button","s","удалить");d.onclick=()=>api("/api/gifts/delete",{id:i.id}).catch(fail);r.appendChild(d);c3.appendChild(r)});
+  S.gifts.forEach(i=>{
+    const r=el("div","crow"),t=el("div","t");t.appendChild(document.createTextNode(i.emoji+" "+i.name));
+    t.appendChild(el("div","mu",fmt(i.price)+" 🪙 · продано "+i.sold+(i.supply>0?" из "+i.supply:" (без лимита)")));r.appendChild(t);
+    const e=el("button","s","изменить");e.onclick=()=>openGiftEditor(i);r.appendChild(e);
+    const k="del:"+i.id,d=el("button","s",S.armed===k?"точно удалить?":"удалить");
+    d.onclick=()=>{if(S.armed!==k){S.armed=k;setTimeout(()=>{if(S.armed===k){S.armed="";render(true)}},4000);render(true);return}S.armed="";api("/api/gifts/delete",{id:i.id}).catch(fail)};
+    r.appendChild(d);c3.appendChild(r);
+  });
   if(!S.gifts.length)c3.appendChild(el("div","note","Пока нет подарков."));
   m.appendChild(c3);
+  const c4=el("div","card");c4.appendChild(el("h2","","Монеты пользователя"));
+  const f4=el("div","fr");f4.appendChild(fld("Никнейм",inp("ник","cnick",20)));f4.appendChild(fld("Сколько монет",inp("100","camt",9,true)));c4.appendChild(f4);
+  const row=el("div","fr");row.style.marginTop="8px";
+  const g1=el("button","p","➕ Выдать"),g2=el("button","g2","➖ Списать");g1.onclick=()=>adjust(1);g2.onclick=()=>adjust(-1);row.appendChild(g1);row.appendChild(g2);c4.appendChild(row);
+  m.appendChild(c4);
 }
+async function adjust(sign){
+  const nick=(S.form.cnick||"").trim().replace(/^@/,""),amt=Math.abs(Math.trunc(Number(S.form.camt)));
+  if(!nick||!amt)return toast("Укажите ник и количество монет");
+  try{const r=await api("/api/coins",{nick,amount:sign*amt});toast(r.nick+": "+(r.applied>=0?"+":"")+fmt(r.applied)+" 🪙 → баланс "+fmt(r.coins)+" 🪙");S.form.camt=""}
+  catch(e){return fail(e)}
+  render(true);
+}
+async function addGift(){
+  const e=S.form.emoji.trim(),n=S.form.name.trim();if(!e||!n)return toast("Укажите эмодзи и название");
+  try{await api("/api/gifts",{emoji:e,name:n,price:S.form.price||0,supply:S.form.supply||0});S.form.name="";S.form.price="";S.form.supply="";toast("Подарок выпущен")}catch(x){return fail(x)}
+  render(true);
+}
+function openGiftEditor(g){
+  sheet(s=>{
+    s.appendChild(el("h2","","Изменить подарок"));
+    const f={emoji:g.emoji,name:g.name,price:String(g.price),supply:g.supply>0?String(g.supply):""};
+    const mk=(label,key,num,max)=>{const i=el("input","f");i.value=f[key];if(num){i.type="number";i.min=0;i.inputMode="numeric"}if(max)i.maxLength=max;i.oninput=()=>f[key]=i.value;s.appendChild(fld(label,i))};
+    mk("Эмодзи","emoji",0,8);mk("Название","name",0,30);mk("Цена, 🪙","price",1);mk("Лимит выпуска (тираж), пусто или 0 — без лимита","supply",1);
+    s.appendChild(el("div","mu","Уже продано: "+g.sold+". Тираж нельзя сделать меньше проданного. Правка не меняет подарки, которые уже отправлены."));
+    const e1=el("div","err");s.appendChild(e1);
+    const b=el("button","p w","Сохранить");s.appendChild(b);
+    b.onclick=async()=>{
+      b.disabled=true;e1.textContent="";
+      try{await api("/api/gifts/update",{id:g.id,emoji:f.emoji.trim(),name:f.name.trim(),price:f.price||0,supply:f.supply||0});closeSheet();toast("Подарок обновлён")}
+      catch(e){b.disabled=false;if(e.status===401)return logout();e1.textContent=e.message}
+    };
+  },"gift");
+}
+$("#main").addEventListener("focusout",()=>{if(S.dirty){S.dirty=false;setTimeout(()=>{if(!$("#main").contains(document.activeElement))render()},60)}});
 let first=true;
 function render(force){
   if(S.auth!=="ok")return;
@@ -237,10 +346,13 @@ function render(force){
   showReply();
   if(!(S.view==="chat"||dmv))$("#emo").hidden=true;
   const m=$("#main"),near=m.scrollHeight-m.scrollTop-m.clientHeight<80;
+  const ae=document.activeElement,keep=(S.view==="shop"||S.view==="admin")?m.scrollTop:null;
+  if(!force&&keep!==null&&ae&&m.contains(ae)&&/INPUT|SELECT|TEXTAREA/.test(ae.tagName)){S.dirty=true;return}
   m.textContent="";
   if(S.view==="chat")chat(m,S.msgs,false);
-  else if(dmv)chat(m,th.map(x=>({id:x.id,uid:x.from,type:"text",text:x.text,ts:x.ts,reply:x.reply})),true);
-  else if(S.view==="gifts")giftsTab(m);else admin(m);
+  else if(dmv)chat(m,th.map(x=>x.kind==="gift"&&x.gift?{id:x.id,uid:x.from,type:"giftcard",gift:x.gift,text:x.text,ts:x.ts,reply:x.reply}:{id:x.id,uid:x.from,type:"text",text:x.text,ts:x.ts,reply:x.reply}),true);
+  else if(S.view==="shop")shop(m);else admin(m);
+  if(keep!==null)m.scrollTop=keep;
   if((S.view==="chat"||dmv)&&(near||first||force))m.scrollTop=m.scrollHeight;
   first=false;
   placeMenu();
@@ -251,16 +363,7 @@ async function send(){
   const rp=S.reply&&S.reply.view===S.view?S.reply.id:undefined;
   try{await api(dmv?"/api/dm":"/api/send",dmv?{to:S.view.slice(3),text:t,reply:rp}:{text:t,reply:rp});S.reply=null;showReply()}catch(e){i.value=i.value||t;fail(e)}
 }
-async function addGift(){
-  const e=S.form.emoji.trim(),n=S.form.name.trim();if(!e||!n)return;
-  try{await api("/api/gifts",{emoji:e,name:n});S.form.name="";S.err=""}catch(x){return fail(x)}render();
-}
-async function sendGift(){
-  if(!S.form.gift||!S.form.to)return;
-  try{await api("/api/give",{giftId:S.form.gift,to:S.form.to});S.form.gift="";S.view="chat";S.err=""}catch(x){return fail(x)}
-  render(true);
-}
-function snip(x){return x.type==="gift"?"🎁 "+(x.gname||""):String(x.text||"").slice(0,100)}
+function snip(x){return x.type==="giftcard"?"🎁 "+(x.gift&&x.gift.name||""):x.type==="gift"?"🎁 "+(x.gname||""):String(x.text||"").slice(0,100)}
 let menuFor=null,toastT=null;
 function toast(t){const e=$("#toast");e.textContent=t;e.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>{e.hidden=true},2400)}
 function closeMenu(){menuFor=null;$("#menu").hidden=true}
@@ -269,7 +372,7 @@ function openMenu(x,dm,b){
   const mn=$("#menu");mn.textContent="";menuFor=x.id;
   const btn=(t,f,c)=>{const k=el("button",c||"",t);k.onclick=e=>{e.stopPropagation();f(k)};mn.appendChild(k)};
   btn("↩ Ответить",()=>{S.reply={id:x.id,uid:x.uid,text:snip(x),view:S.view};closeMenu();showReply();$("#inp").focus()});
-  if(x.type!=="gift")btn("⧉ Копировать",()=>{copy(x.text||"");closeMenu();toast("Скопировано")});
+  if(x.type==="text")btn("⧉ Копировать",()=>{copy(x.text||"");closeMenu();toast("Скопировано")});
   if(x.uid===S.me||S.owner){
     let armed=false;
     btn("🗑 Удалить",k=>{
@@ -318,9 +421,11 @@ function openDrawer(){
   const d=$("#drawer");d.textContent="";
   const u=S.U[S.me]||{nick:"",bio:""};
   const h=el("div","dh");h.appendChild(av(S.me,ini(S.me)));h.appendChild(el("div","n",u.nick));if(u.bio)h.appendChild(el("div","b",u.bio));
+  h.appendChild(el("div","dbal","🪙 "+fmt(S.coins)));
   d.appendChild(h);
   const it=(t,f,c)=>{const b=el("button","dit"+(c?" "+c:""),t);b.onclick=f;d.appendChild(b)};
-  it("👤  Профиль",openEditor);
+  it("👤  Профиль",()=>{closeDrawer();openProfile(S.me)});
+  it("🎁  Магазин подарков",()=>{closeDrawer();S.view="shop";S.open=true;render(true)});
   it("⚙  Настройки",openSettings);
   it("🚪  Выйти",()=>{closeDrawer();logout()},"red");
   d.appendChild(el("div","dft","Turbogram"));
@@ -333,8 +438,21 @@ function openProfile(id){
     const c=el("div","ctr");const a=av(id,ini(id));a.classList.add("xl");c.appendChild(a);s.appendChild(c);
     s.appendChild(el("h2","",u.nick+(id===S.me?" (вы)":"")));
     s.appendChild(u.bio?el("p","bio",u.bio):el("p","mu ctr2","Нет описания"));
-    if(id===S.me){const b=el("button","p w","✎ Редактировать профиль");b.onclick=openEditor;s.appendChild(b)}
-    else{const b=el("button","p w","Написать");b.onclick=()=>writeTo(id);s.appendChild(b)}
+    if(id===S.me){
+      const bal=el("div","bal ctr2");bal.appendChild(document.createTextNode("Баланс: "));bal.appendChild(el("b","",fmt(S.coins)+" 🪙"));s.appendChild(bal);
+      s.appendChild(dailyBtn());
+    }
+    const gl=(S.recv[id]||[]).slice().reverse();
+    s.appendChild(el("label","","Подарки ("+gl.length+")"));
+    if(!gl.length)s.appendChild(el("p","mu","Пока нет подарков"));
+    else{const g=el("div","pgrid");gl.forEach(i=>{const d=gcard(i);d.appendChild(el("div","gfrom","от "+nm(i.from)));g.appendChild(d)});s.appendChild(g)}
+    if(id===S.me){
+      const b=el("button","g2","🎁 Магазин подарков");b.onclick=()=>{closeSheet();S.view="shop";S.open=true;render(true)};s.appendChild(b);
+      const e=el("button","p w","✎ Редактировать профиль");e.onclick=openEditor;s.appendChild(e);
+    }else{
+      const b=el("button","p w","Написать");b.onclick=()=>writeTo(id);s.appendChild(b);
+      const g=el("button","g2","🎁 Подарить");g.onclick=()=>{closeSheet();S.form.to=id;S.view="shop";S.open=true;render(true)};s.appendChild(g);
+    }
   },"view",id);
 }
 function writeTo(id){closeSheet();S.view="dm:"+id;S.open=true;S.q="";$("#q").value="";render(true);$("#inp").focus()}
@@ -427,15 +545,16 @@ function connect(){
   if(es)es.close();
   es=new EventSource(BASE+"/api/events?token="+encodeURIComponent(TOKEN));
   const on=(n,f)=>es.addEventListener(n,e=>f(JSON.parse(e.data)));
-  on("init",d=>{S.me=d.me.id;S.owner=d.me.owner;S.U={};S.nick={};S.members=d.members.map(m=>{setU(m);return m.id});S.gifts=d.gifts;S.recv=d.received;S.msgs=d.messages;S.dms=d.dms||[];try{S.read=JSON.parse(ls.get("rd:"+S.me)||"{}")}catch(e){S.read={}}S.err="";S.auth="ok";showAuth();render(true)});
+  on("init",d=>{S.me=d.me.id;S.owner=d.me.owner;S.U={};S.nick={};S.members=d.members.map(m=>{setU(m);return m.id});S.coins=d.me.coins||0;S.lastDaily=d.me.lastDaily||0;S.gifts=d.gifts;S.recv=d.received;S.msgs=d.messages;S.dms=d.dms||[];try{S.read=JSON.parse(ls.get("rd:"+S.me)||"{}")}catch(e){S.read={}}S.err="";S.auth="ok";showAuth();render(true)});
   on("msg",m=>{S.msgs.push(m);if(S.msgs.length>300)S.msgs.shift();render()});
   on("dm",m=>{S.dms.push(m);render()});
   on("del",d=>{if(d.kind==="dm")S.dms=S.dms.filter(x=>x.id!==d.id);else S.msgs=S.msgs.filter(x=>x.id!==d.id);if(S.reply&&S.reply.id===d.id)S.reply=null;if(menuFor===d.id)closeMenu();render()});
   on("member",m=>{if(!S.U[m.id])S.members.push(m.id);setU(m);render()});
   on("profile",m=>{setU(m);render();if(!$("#sov").hidden&&sheetMode==="view"&&sheetFor===m.id)openProfile(m.id);if($("#drawer").classList.contains("on"))openDrawer()});
-  on("gift",g=>{S.gifts.push(g);render()});
+  on("gift",g=>{const i=S.gifts.findIndex(x=>x.id===g.id);if(i>=0)S.gifts[i]=g;else S.gifts.push(g);render()});
+  on("coins",d=>{S.coins=d.coins;if(d.lastDaily)S.lastDaily=d.lastDaily;refreshCoins()});
   on("giftdel",d=>{S.gifts=S.gifts.filter(g=>g.id!==d.id);render()});
-  on("received",d=>{(S.recv[d.to]=S.recv[d.to]||[]).push(d.item);render()});
+  on("received",d=>{(S.recv[d.to]=S.recv[d.to]||[]).push(d.item);render();if(!$("#sov").hidden&&sheetMode==="view"&&sheetFor===d.to)openProfile(d.to);if(d.to===S.me)toast("🎁 "+nm(d.item.from)+" дарит вам «"+d.item.name+"»")});
   es.onerror=async()=>{
     try{const r=await fetch(BASE+"/api/me?token="+encodeURIComponent(TOKEN));if(r.status===401)return logout()}
     catch(e){}
