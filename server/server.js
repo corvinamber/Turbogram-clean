@@ -7,6 +7,9 @@ const { createClient } = require('@supabase/supabase-js');
 const scrypt = promisify(crypto.scrypt);
 
 const PORT = process.env.PORT || 3000;
+// РЕЖИМ ПРЕДПРОСМОТРА (по умолчанию выключен): вход по одному нику без проверки пароля.
+// Включается только вручную: PREVIEW_NO_PASSWORD=1. Сервер при этом слушает лишь localhost.
+const PREVIEW = process.env.PREVIEW_NO_PASSWORD === '1';
 const { SUPABASE_URL, SUPABASE_SERVICE_KEY } = process.env;
 if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
   console.error('Задайте SUPABASE_URL и SUPABASE_SERVICE_KEY (см. README).');
@@ -49,6 +52,15 @@ async function replyOfDm(id, a, b) {
   const ok = o && ((o.from_uid === a && o.to_uid === b) || (o.from_uid === b && o.to_uid === a));
   return ok ? { reply_to: o.id, reply_uid: o.from_uid, reply_text: snip(o.text) } : null;
 }
+// Публичные данные профиля: сам аватар в списки не кладём (он отдаётся отдельным запросом /api/avatar/<id>)
+const pubUser = r => ({ id: r.id, nick: r.nick, bio: r.bio || '', av: r.avatar_ts || 0 });
+function okAvatar(a) {
+  if (typeof a !== 'string' || a.length > 150000) return false;
+  const m = /^data:image\/jpeg;base64,([A-Za-z0-9+/]+={0,2})$/.exec(a);
+  if (!m) return false;
+  const buf = Buffer.from(m[1], 'base64');
+  return buf.length <= 100000 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff;   // это действительно JPEG
+}
 const outRecv = r => ({ emoji: r.emoji, name: r.name, from: r.from_uid, ts: r.ts });
 
 let ownerCache = null;
@@ -79,7 +91,7 @@ async function userOf(token) {
 async function initData(u) {
   const [owner, members, gifts, recv, msgs, dms] = await Promise.all([
     ownerId(),
-    run(sb.from('users').select('id,nick').order('created_at', { ascending: true }).limit(5000)),
+    run(sb.from('users').select('id,nick,bio,avatar_ts').order('created_at', { ascending: true }).limit(5000)),
     run(sb.from('gifts').select('id,emoji,name,ts').order('ts', { ascending: true })),
     run(sb.from('received').select('user_id,emoji,name,from_uid,ts').order('ts', { ascending: true })),
     run(sb.from('messages').select(MSG_COLS).order('ts', { ascending: false }).limit(200)),
@@ -89,7 +101,7 @@ async function initData(u) {
   recv.forEach(r => (received[r.user_id] = received[r.user_id] || []).push(outRecv(r)));
   return {
     me: { id: u.id, nick: u.nick, owner: owner === u.id },
-    members, gifts, received,
+    members: members.map(pubUser), gifts, received,
     messages: msgs.reverse().map(outMsg),
     dms: dms.reverse().map(outDm)
   };
@@ -100,18 +112,18 @@ function send(res, code, obj) {
   res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8' });
   res.end(JSON.stringify(obj));
 }
-function body(req) {
+function body(req, max = 20000) {
   return new Promise((ok, no) => {
     let s = '';
     const bad = () => { const e = new Error('bad'); e.bad = true; no(e); };
-    req.on('data', c => { s += c; if (s.length > 20000) { bad(); req.destroy(); } });
+    req.on('data', c => { s += c; if (s.length > max) { bad(); req.destroy(); } });
     req.on('end', () => { try { ok(s ? JSON.parse(s) : {}); } catch (e) { bad(); } });
   });
 }
 
 async function api(req, res, url) {
   const p = url.pathname;
-  if (req.method === 'GET' && p === '/api/ping') return send(res, 200, { ok: true });
+  if (req.method === 'GET' && p === '/api/ping') return send(res, 200, { ok: true, preview: PREVIEW });
   if (req.method === 'GET' && p === '/api/me') {
     const u = await userOf(url.searchParams.get('token'));
     return u ? send(res, 200, u) : send(res, 401, { error: 'Нужно войти' });
@@ -127,8 +139,25 @@ async function api(req, res, url) {
     res.write(frame('init', init));
     return;
   }
+  const am = /^\/api\/avatar\/([0-9a-f-]{36})$/i.exec(p);
+  if (req.method === 'GET' && am) {
+    const r = UUID.test(am[1]) ? await run(sb.from('users').select('avatar').eq('id', am[1]).maybeSingle()) : null;
+    const mm = r && r.avatar && /^data:image\/jpeg;base64,(.+)$/.exec(r.avatar);
+    if (!mm) { res.writeHead(404); return res.end(); }
+    // адрес картинки содержит версию (?v=), поэтому её можно кэшировать надолго
+    res.writeHead(200, { 'Content-Type': 'image/jpeg', 'Cache-Control': 'public, max-age=31536000, immutable' });
+    return res.end(Buffer.from(mm[1], 'base64'));
+  }
+  if (req.method === 'GET' && p === '/api/nick-free') {
+    const u = await userOf(url.searchParams.get('token'));
+    if (!u) return send(res, 401, { error: 'Нужно войти' });
+    const nick = clean(url.searchParams.get('nick'), 40);
+    if (!/^[A-Za-z0-9_]{3,20}$/.test(nick)) return send(res, 200, { free: false });
+    const r = await run(sb.from('users').select('id').eq('nick_lower', nick.toLowerCase()).maybeSingle());
+    return send(res, 200, { free: !r || r.id === u.id });
+  }
   if (req.method !== 'POST') return send(res, 404, { error: 'Не найдено' });
-  const b = await body(req);
+  const b = await body(req, p === '/api/profile' ? 300000 : 20000);
 
   if (p === '/api/register') {
     const nick = clean(b.nick, 40), pw = String(b.password || ''), low = nick.toLowerCase();
@@ -142,14 +171,14 @@ async function api(req, res, url) {
       throw error;
     }
     const token = await newSession(u.id);
-    broadcast('member', u);
+    broadcast('member', pubUser(u));
     return send(res, 200, { token, me: u });
   }
   if (p === '/api/login') {
     const low = clean(b.nick, 40).toLowerCase(), f = fails.get(low) || { n: 0, until: 0 };
     if (Date.now() < f.until) return send(res, 429, { error: 'Слишком много попыток, подождите минуту' });
     const u = await run(sb.from('users').select('id,nick,salt,hash').eq('nick_lower', low).maybeSingle());
-    if (!u || !same(await hashPw(String(b.password || ''), u.salt), u.hash)) {
+    if (!u || (!PREVIEW && !same(await hashPw(String(b.password || ''), u.salt), u.hash))) {
       f.n++; if (f.n >= 5) { f.until = Date.now() + 60000; f.n = 0; } fails.set(low, f);
       return send(res, 401, { error: 'Неверный ник или пароль' });
     }
@@ -194,6 +223,30 @@ async function api(req, res, url) {
     return send(res, 200, { ok: true });
   }
 
+  if (p === '/api/profile') {
+    const upd = {};
+    if (b.nick !== undefined) {
+      const nick = clean(b.nick, 40);
+      if (!/^[A-Za-z0-9_]{3,20}$/.test(nick)) return send(res, 400, { error: 'Ник: 3–20 символов, латиница, цифры и _' });
+      if (nick !== u.nick) { upd.nick = nick; upd.nick_lower = nick.toLowerCase(); }
+    }
+    if (b.bio !== undefined) upd.bio = String(b.bio == null ? '' : b.bio).trim().slice(0, 200);
+    if (b.avatar !== undefined) {
+      if (b.avatar === null) { upd.avatar = null; upd.avatar_ts = 0; }
+      else if (okAvatar(b.avatar)) { upd.avatar = b.avatar; upd.avatar_ts = Date.now(); }
+      else return send(res, 400, { error: 'Некорректное изображение (нужен JPEG до 100 КБ)' });
+    }
+    if (!Object.keys(upd).length) return send(res, 200, { ok: true, me: pubUser(await run(sb.from('users').select('id,nick,bio,avatar_ts').eq('id', u.id).maybeSingle())) });
+    // уникальность ника гарантирует UNIQUE(nick_lower) в базе, поэтому гонки невозможны
+    const { data: r, error } = await sb.from('users').update(upd).eq('id', u.id).select('id,nick,bio,avatar_ts').single();
+    if (error) {
+      if (error.code === '23505') return send(res, 409, { error: 'Ник «' + upd.nick + '» уже занят' });
+      throw error;
+    }
+    for (const [t, c] of sessCache) if (c.u.id === u.id) sessCache.delete(t);
+    broadcast('profile', pubUser(r));
+    return send(res, 200, { ok: true, me: pubUser(r) });
+  }
   if (p === '/api/delete') {
     const dm = b.kind === 'dm';
     if (!dm && b.kind !== 'msg') return send(res, 400, { error: 'Некорректный запрос' });
@@ -256,8 +309,9 @@ http.createServer(async (req, res) => {
     if (!e.bad) console.error(e);
     if (!res.headersSent) send(res, e.bad ? 400 : 500, { error: e.bad ? 'Некорректный запрос' : 'Ошибка сервера, попробуйте позже' });
   }
-}).listen(PORT, () => {
+}).listen(PORT, ...(PREVIEW ? ['127.0.0.1'] : []), () => {
   console.log('Turbogram запущен: http://localhost:' + PORT);
+  if (PREVIEW) console.warn('⚠ РЕЖИМ ПРЕДПРОСМОТРА: пароли НЕ проверяются, доступ только с этого компьютера. Не используйте на рабочем сервере!');
   // чистим сессии старше 90 дней
   sb.from('sessions').delete().lt('created_at', new Date(Date.now() - 90 * 864e5).toISOString())
     .then(() => {}, () => {});
