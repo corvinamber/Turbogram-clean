@@ -27,6 +27,14 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const fails = new Map();           // защита от подбора пароля (в памяти, это допустимо)
 const sessCache = new Map();       // token -> { u, exp }
 
+/* ---------- Экономика: монеты ---------- */
+const START_COINS = 50, DAILY_COINS = 50, DAILY_MS = 24 * 3600 * 1000;
+const CHAT_COINS = 2, CHAT_COOLDOWN = 15000, CHAT_DAY_CAP = 100, MAX_COINS = 1000000000;
+const dayKey = ts => new Date(ts).toISOString().slice(0, 10);   // день по UTC
+// Все операции с монетами и тиражом идут по очереди (сервер работает в одном экземпляре)
+let chain = Promise.resolve();
+const locked = fn => { const r = chain.then(() => fn()); chain = r.then(() => {}, () => {}); return r; };
+
 /* ---------- SSE: рассылка подключённым клиентам ---------- */
 const clients = new Set();
 const frame = (ev, data) => 'event: ' + ev + '\ndata: ' + JSON.stringify(data) + '\n\n';
@@ -35,12 +43,15 @@ function toUsers(ev, data, ids) { const m = frame(ev, data); for (const c of cli
 
 /* ---------- хранилище (Supabase) ---------- */
 const MSG_COLS = 'id,uid,type,text,to_uid,emoji,gname,ts,reply_to,reply_uid,reply_text';
-const DM_COLS = 'id,from_uid,to_uid,text,ts,reply_to,reply_uid,reply_text';
+const DM_COLS = 'id,from_uid,to_uid,text,ts,reply_to,reply_uid,reply_text,kind,gift';
+const GIFT_COLS = 'id,emoji,name,ts,price,supply,sold';
+const RECV_COLS = 'id,user_id,gift_id,emoji,name,price,serial,supply,note,from_uid,ts';
 const rp = r => r.reply_to ? { id: r.reply_to, uid: r.reply_uid, text: r.reply_text } : undefined;
 const outMsg = r => r.type === 'gift'
   ? { id: r.id, uid: r.uid, type: 'gift', to: r.to_uid, emoji: r.emoji, gname: r.gname, ts: r.ts, reply: rp(r) }
   : { id: r.id, uid: r.uid, type: 'text', text: r.text, ts: r.ts, reply: rp(r) };
-const outDm = r => ({ id: r.id, from: r.from_uid, to: r.to_uid, text: r.text, ts: r.ts, reply: rp(r) });
+const outDm = r => ({ id: r.id, from: r.from_uid, to: r.to_uid, text: r.text, ts: r.ts, reply: rp(r), kind: r.kind || 'text', gift: r.gift || undefined });
+const outGift = g => ({ id: g.id, emoji: g.emoji, name: g.name, price: g.price | 0, supply: g.supply | 0, sold: g.sold | 0, ts: g.ts });
 // Цитата строится на сервере по исходному сообщению, клиенту не доверяем
 const snip = (t, n = 100) => String(t || '').slice(0, n);
 async function replyOfMsg(id) {
@@ -61,7 +72,7 @@ function okAvatar(a) {
   const buf = Buffer.from(m[1], 'base64');
   return buf.length <= 100000 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff;   // это действительно JPEG
 }
-const outRecv = r => ({ emoji: r.emoji, name: r.name, from: r.from_uid, ts: r.ts });
+const outRecv = r => ({ id: r.id, emoji: r.emoji, name: r.name, from: r.from_uid, ts: r.ts, price: r.price | 0, serial: r.serial | 0, supply: r.supply | 0, note: r.note || '' });
 
 let ownerCache = null;
 async function ownerId() {
@@ -88,20 +99,46 @@ async function userOf(token) {
   if (u) sessCache.set(token, { u, exp: Date.now() + 60000 });
   return u;
 }
+const ECO_COLS = 'id,nick,coins,last_daily,chat_last_ts,chat_day,chat_day_coins';
+const getEco = id => run(sb.from('users').select(ECO_COLS).eq('id', id).maybeSingle());
+// «Сравнить и поменять»: баланс меняется, только если он не изменился с момента чтения
+async function casUser(id, oldCoins, patch) {
+  const rows = await run(sb.from('users').update(patch).eq('id', id).eq('coins', oldCoins).select('coins'));
+  return rows && rows.length ? rows[0] : null;
+}
+const pushCoins = (id, coins, lastDaily) => toUsers('coins', { coins, lastDaily: Number(lastDaily) || 0 }, [id]);
+// +2 монеты за сообщение: кулдаун 15 с и не более 100 монет в день
+async function rewardChat(uid) {
+  try {
+    return await locked(async () => {
+      const r = await getEco(uid); if (!r) return null;
+      const now = Date.now(), day = dayKey(now);
+      const dc = r.chat_day === day ? (r.chat_day_coins | 0) : 0;
+      if (now - (Number(r.chat_last_ts) || 0) < CHAT_COOLDOWN) return null;
+      if (dc + CHAT_COINS > CHAT_DAY_CAP) return null;
+      const coins = Math.min(MAX_COINS, r.coins + CHAT_COINS);
+      if (!(await casUser(uid, r.coins, { coins, chat_last_ts: now, chat_day: day, chat_day_coins: dc + CHAT_COINS }))) return null;
+      pushCoins(uid, coins, r.last_daily);
+      return { coins, earned: CHAT_COINS };
+    });
+  } catch (e) { console.error(e); return null; }   // сбой начисления не должен ломать отправку сообщения
+}
+
 async function initData(u) {
-  const [owner, members, gifts, recv, msgs, dms] = await Promise.all([
+  const [owner, members, gifts, recv, msgs, dms, eco] = await Promise.all([
     ownerId(),
     run(sb.from('users').select('id,nick,bio,avatar_ts').order('created_at', { ascending: true }).limit(5000)),
-    run(sb.from('gifts').select('id,emoji,name,ts').order('ts', { ascending: true })),
-    run(sb.from('received').select('user_id,emoji,name,from_uid,ts').order('ts', { ascending: true })),
+    run(sb.from('gifts').select(GIFT_COLS).order('ts', { ascending: true })),
+    run(sb.from('received').select(RECV_COLS).order('ts', { ascending: false }).limit(5000)),
     run(sb.from('messages').select(MSG_COLS).order('ts', { ascending: false }).limit(200)),
-    run(sb.from('dms').select(DM_COLS).or('from_uid.eq.' + u.id + ',to_uid.eq.' + u.id).order('ts', { ascending: false }).limit(500))
+    run(sb.from('dms').select(DM_COLS).or('from_uid.eq.' + u.id + ',to_uid.eq.' + u.id).order('ts', { ascending: false }).limit(500)),
+    getEco(u.id)
   ]);
   const received = {};
-  recv.forEach(r => (received[r.user_id] = received[r.user_id] || []).push(outRecv(r)));
+  recv.reverse().forEach(r => (received[r.user_id] = received[r.user_id] || []).push(outRecv(r)));
   return {
-    me: { id: u.id, nick: u.nick, owner: owner === u.id },
-    members: members.map(pubUser), gifts, received,
+    me: { id: u.id, nick: u.nick, owner: owner === u.id, coins: eco ? eco.coins : 0, lastDaily: eco ? Number(eco.last_daily) || 0 : 0 },
+    members: members.map(pubUser), gifts: gifts.map(outGift), received,
     messages: msgs.reverse().map(outMsg),
     dms: dms.reverse().map(outDm)
   };
@@ -165,7 +202,7 @@ async function api(req, res, url) {
     if (pw.length < 6 || pw.length > 100) return send(res, 400, { error: 'Пароль: от 6 символов' });
     const salt = rid();
     // уникальность ника гарантирует ограничение UNIQUE(nick_lower) в базе
-    const { data: u, error } = await sb.from('users').insert({ nick, nick_lower: low, salt, hash: await hashPw(pw, salt) }).select('id,nick').single();
+    const { data: u, error } = await sb.from('users').insert({ nick, nick_lower: low, salt, hash: await hashPw(pw, salt), coins: START_COINS }).select('id,nick').single();
     if (error) {
       if (error.code === '23505') return send(res, 409, { error: 'Ник «' + nick + '» уже занят' });
       throw error;
@@ -204,7 +241,7 @@ async function api(req, res, url) {
     }
     const r = await run(sb.from('messages').insert({ uid: u.id, type: 'text', text, ts: Date.now(), ...rep }).select(MSG_COLS).single());
     broadcast('msg', outMsg(r));
-    return send(res, 200, { ok: true });
+    return send(res, 200, { ok: true, ...(await rewardChat(u.id) || {}) });
   }
   if (p === '/api/dm') {
     const text = clean(b.text, 1000);
@@ -220,7 +257,61 @@ async function api(req, res, url) {
     }
     const r = await run(sb.from('dms').insert({ from_uid: u.id, to_uid: to.id, text, ts: Date.now(), ...rep }).select(DM_COLS).single());
     toUsers('dm', outDm(r), [u.id, to.id]);
-    return send(res, 200, { ok: true });
+    return send(res, 200, { ok: true, ...(await rewardChat(u.id) || {}) });
+  }
+
+  /* ----- ежедневный бонус ----- */
+  if (p === '/api/daily') {
+    return locked(async () => {
+      const r = await getEco(u.id), now = Date.now(), last = Number(r.last_daily) || 0;
+      if (now - last < DAILY_MS) return send(res, 429, { error: 'Бонус пока недоступен', lastDaily: last, coins: r.coins });
+      const coins = Math.min(MAX_COINS, r.coins + DAILY_COINS);
+      if (!(await casUser(u.id, r.coins, { coins, last_daily: now }))) return send(res, 409, { error: 'Попробуйте ещё раз' });
+      pushCoins(u.id, coins, now);
+      return send(res, 200, { ok: true, coins, lastDaily: now, gained: DAILY_COINS });
+    });
+  }
+
+  /* ----- покупка и отправка подарка: карточка приходит в ЛС получателя ----- */
+  if (p === '/api/buy') {
+    const isOwner = (await ownerId()) === u.id;
+    return locked(async () => {
+      if (!UUID.test(String(b.giftId)) || !UUID.test(String(b.to)) || b.to === u.id) return send(res, 400, { error: 'Выберите подарок и другого получателя' });
+      const note = clean(b.note, 80);
+      const g = await run(sb.from('gifts').select(GIFT_COLS).eq('id', b.giftId).maybeSingle());
+      const to = await run(sb.from('users').select('id,nick').eq('id', b.to).maybeSingle());
+      if (!g || !to) return send(res, 404, { error: 'Подарок или получатель не найден' });
+      const price = g.price | 0, supply = g.supply | 0, sold = g.sold | 0;
+      if (supply > 0 && sold >= supply) return send(res, 409, { error: 'Подарок распродан' });
+      const free = b.free === true && isOwner;          // бесплатно может дарить только владелец
+      const me = await getEco(u.id), paid = !free && price > 0;
+      if (paid && me.coins < price) return send(res, 402, { error: 'Не хватает монет: нужно ' + price + ', у вас ' + me.coins });
+      const newCoins = paid ? me.coins - price : me.coins;
+      // 1) списываем монеты
+      if (paid && !(await casUser(u.id, me.coins, { coins: newCoins }))) return send(res, 409, { error: 'Баланс изменился, попробуйте ещё раз' });
+      const refund = async () => { if (!paid) return; try { const c = await getEco(u.id); await casUser(u.id, c.coins, { coins: Math.min(MAX_COINS, c.coins + price) }); } catch (e) { console.error(e); } };
+      // 2) занимаем следующий номер тиража (условное обновление защищает от гонок)
+      const serial = sold + 1;
+      let claimed;
+      try { claimed = await run(sb.from('gifts').update({ sold: serial }).eq('id', g.id).eq('sold', sold).select(GIFT_COLS)); }
+      catch (e) { await refund(); throw e; }
+      if (!claimed.length) { await refund(); return send(res, 409, { error: 'Подарок только что купили, попробуйте ещё раз' }); }
+      // 3) запись в профиль получателя и карточка в личные сообщения
+      const ts = Date.now(); let rec = null, dm = null;
+      try {
+        rec = await run(sb.from('received').insert({ user_id: to.id, gift_id: g.id, emoji: g.emoji, name: g.name, price, serial, supply: supply || null, note: note || null, from_uid: u.id, ts }).select(RECV_COLS).single());
+        const card = { id: g.id, emoji: g.emoji, name: g.name, price, serial, supply, note };
+        dm = await run(sb.from('dms').insert({ from_uid: u.id, to_uid: to.id, text: '🎁 ' + g.name, ts, kind: 'gift', gift: card }).select(DM_COLS).single());
+      } catch (e) {   // откат: вернуть монеты, номер и записи
+        try { if (rec) await sb.from('received').delete().eq('id', rec.id); await sb.from('gifts').update({ sold }).eq('id', g.id).eq('sold', serial); } catch (e2) { console.error(e2); }
+        await refund(); throw e;
+      }
+      toUsers('dm', outDm(dm), [u.id, to.id]);
+      broadcast('received', { to: to.id, item: outRecv(rec) });
+      broadcast('gift', outGift(claimed[0]));
+      pushCoins(u.id, newCoins, me.last_daily);
+      return send(res, 200, { ok: true, coins: newCoins, serial, supply });
+    });
   }
 
   if (p === '/api/profile') {
@@ -264,30 +355,54 @@ async function api(req, res, url) {
   }
 
   if ((await ownerId()) !== u.id) return send(res, 403, { error: 'Только для владельца' });
+  const num = (v, max) => { const n = Math.trunc(Number(v === '' || v == null ? 0 : v)); return Number.isFinite(n) && n >= 0 && n <= max ? n : null; };
   if (p === '/api/gifts') {
-    const emoji = clean(b.emoji, 8), name = clean(b.name, 30);
+    const emoji = clean(b.emoji, 8), name = clean(b.name, 30), price = num(b.price, 1000000), supply = num(b.supply, 1000000);
     if (!emoji || !name) return send(res, 400, { error: 'Нужны эмодзи и название' });
-    const g = await run(sb.from('gifts').insert({ emoji, name, ts: Date.now() }).select('id,emoji,name,ts').single());
-    broadcast('gift', g);
-    return send(res, 200, g);
+    if (price === null) return send(res, 400, { error: 'Цена: целое число от 0 до 1 000 000' });
+    if (supply === null) return send(res, 400, { error: 'Лимит выпуска: целое число (0 или пусто — без лимита)' });
+    const g = await run(sb.from('gifts').insert({ emoji, name, price, supply: supply || null, sold: 0, ts: Date.now() }).select(GIFT_COLS).single());
+    broadcast('gift', outGift(g));
+    return send(res, 200, outGift(g));
+  }
+  if (p === '/api/gifts/update') {
+    if (!UUID.test(String(b.id))) return send(res, 400, { error: 'Нет такого подарка' });
+    const cur = await run(sb.from('gifts').select(GIFT_COLS).eq('id', b.id).maybeSingle());
+    if (!cur) return send(res, 404, { error: 'Подарок не найден' });
+    const upd = {};
+    if (b.emoji !== undefined) { const v = clean(b.emoji, 8); if (!v) return send(res, 400, { error: 'Нужен эмодзи' }); upd.emoji = v; }
+    if (b.name !== undefined) { const v = clean(b.name, 30); if (!v) return send(res, 400, { error: 'Нужно название' }); upd.name = v; }
+    if (b.price !== undefined) { const v = num(b.price, 1000000); if (v === null) return send(res, 400, { error: 'Цена: целое число от 0 до 1 000 000' }); upd.price = v; }
+    if (b.supply !== undefined) {
+      const v = num(b.supply, 1000000);
+      if (v === null) return send(res, 400, { error: 'Лимит выпуска: целое число (0 или пусто — без лимита)' });
+      if (v > 0 && v < (cur.sold | 0)) return send(res, 400, { error: 'Тираж не может быть меньше уже проданного (' + (cur.sold | 0) + ')' });
+      upd.supply = v || null;
+    }
+    if (!Object.keys(upd).length) return send(res, 200, outGift(cur));
+    // уже отправленные подарки хранят свою копию данных и не меняются
+    const g = await run(sb.from('gifts').update(upd).eq('id', cur.id).select(GIFT_COLS).single());
+    broadcast('gift', outGift(g));
+    return send(res, 200, outGift(g));
   }
   if (p === '/api/gifts/delete') {
     if (!UUID.test(String(b.id))) return send(res, 400, { error: 'Нет такого подарка' });
-    await run(sb.from('gifts').delete().eq('id', b.id));
+    await run(sb.from('gifts').delete().eq('id', b.id));   // подарки, уже полученные пользователями, остаются в их профилях
     broadcast('giftdel', { id: b.id });
     return send(res, 200, { ok: true });
   }
-  if (p === '/api/give') {
-    if (!UUID.test(String(b.giftId)) || !UUID.test(String(b.to))) return send(res, 400, { error: 'Нет такого подарка или участника' });
-    const g = await run(sb.from('gifts').select('id,emoji,name').eq('id', b.giftId).maybeSingle());
-    const to = await run(sb.from('users').select('id').eq('id', b.to).maybeSingle());
-    if (!g || !to) return send(res, 400, { error: 'Нет такого подарка или участника' });
-    const ts = Date.now();
-    await run(sb.from('received').insert({ user_id: to.id, emoji: g.emoji, name: g.name, from_uid: u.id, ts }));
-    const m = await run(sb.from('messages').insert({ uid: u.id, type: 'gift', to_uid: to.id, emoji: g.emoji, gname: g.name, ts }).select(MSG_COLS).single());
-    broadcast('received', { to: to.id, item: { emoji: g.emoji, name: g.name, from: u.id, ts } });
-    broadcast('msg', outMsg(m));
-    return send(res, 200, { ok: true });
+  /* ----- баланс монет: выдать или списать по нику ----- */
+  if (p === '/api/coins') {
+    return locked(async () => {
+      const amount = Math.trunc(Number(b.amount));
+      if (!Number.isFinite(amount) || amount === 0 || Math.abs(amount) > 1000000) return send(res, 400, { error: 'Укажите количество монет от 1 до 1 000 000' });
+      const t = await run(sb.from('users').select('id,nick').eq('nick_lower', clean(b.nick, 40).toLowerCase()).maybeSingle());
+      if (!t) return send(res, 404, { error: 'Пользователь с таким ником не найден' });
+      const r = await getEco(t.id), coins = Math.max(0, Math.min(MAX_COINS, r.coins + amount));
+      if (!(await casUser(t.id, r.coins, { coins }))) return send(res, 409, { error: 'Баланс изменился, попробуйте ещё раз' });
+      pushCoins(t.id, coins, r.last_daily);
+      return send(res, 200, { ok: true, nick: t.nick, coins, applied: coins - r.coins });
+    });
   }
   return send(res, 404, { error: 'Не найдено' });
 }
