@@ -95,7 +95,7 @@ async function userOf(token) {
   if (c && c.exp > Date.now()) return c.u;
   const s = await run(sb.from('sessions').select('user_id').eq('token', token).maybeSingle());
   if (!s) return null;
-  const u = await run(sb.from('users').select('id,nick').eq('id', s.user_id).maybeSingle());
+  const u = await run(sb.from('users').select('id,nick,is_banned').eq('id', s.user_id).maybeSingle());
   if (u) sessCache.set(token, { u, exp: Date.now() + 60000 });
   return u;
 }
@@ -124,21 +124,61 @@ async function rewardChat(uid) {
   } catch (e) { console.error(e); return null; }   // сбой начисления не должен ломать отправку сообщения
 }
 
+/* ---------- Присутствие: онлайн / был(а) в сети ---------- */
+// Небольшая пауза (5 с, меняется переменной PRESENCE_GRACE_MS), чтобы короткий обрыв связи не мигал статусом
+const GRACE = Number(process.env.PRESENCE_GRACE_MS) || 5000;
+const online = new Map(), offTimers = new Map();      // uid -> число подключений / таймер «ушёл в офлайн»
+const isOnline = id => online.has(id) || offTimers.has(id);
+function goOnline(uid) {
+  const t = offTimers.get(uid);
+  if (t) { clearTimeout(t); offTimers.delete(uid); }
+  const n = online.get(uid) || 0; online.set(uid, n + 1);
+  if (n === 0 && !t) broadcast('presence', { id: uid, on: true });
+}
+function goOffline(uid) {
+  const n = (online.get(uid) || 1) - 1;
+  if (n > 0) { online.set(uid, n); return; }
+  online.delete(uid);
+  offTimers.set(uid, setTimeout(async () => {
+    offTimers.delete(uid);
+    if (online.has(uid)) return;
+    const ls = Date.now();
+    broadcast('presence', { id: uid, on: false, ls });
+    try { await run(sb.from('users').update({ last_seen: ls }).eq('id', uid)); } catch (e) { console.error(e); }
+  }, GRACE));
+}
+
+/* ---------- Блокировки и бан ---------- */
+const BANNED_MSG = 'Владелец ограничил вам отправку сообщений.';
+const BLOCK_MSG = { me: 'Вы заблокировали этого пользователя. Разблокируйте его, чтобы писать.', them: 'Этот пользователь ограничил получение сообщений от вас.' };
+// Возвращает 'me' (я заблокировал его), 'them' (он заблокировал меня) или null
+async function blockState(a, b) {
+  const mine = await run(sb.from('blocked_users').select('blocker_id').eq('blocker_id', a).eq('blocked_id', b).maybeSingle());
+  if (mine) return 'me';
+  const theirs = await run(sb.from('blocked_users').select('blocker_id').eq('blocker_id', b).eq('blocked_id', a).maybeSingle());
+  return theirs ? 'them' : null;
+}
+const myBlocks = async id => (await run(sb.from('blocked_users').select('blocked_id').eq('blocker_id', id))).map(r => r.blocked_id);
+const dropSess = id => { for (const [t, c] of sessCache) if (c.u.id === id) sessCache.delete(t); };
+const typingAt = new Map();
+
 async function initData(u) {
-  const [owner, members, gifts, recv, msgs, dms, eco] = await Promise.all([
+  const [owner, members, gifts, recv, msgs, dms, eco, blocked] = await Promise.all([
     ownerId(),
-    run(sb.from('users').select('id,nick,bio,avatar_ts').order('created_at', { ascending: true }).limit(5000)),
+    run(sb.from('users').select('id,nick,bio,avatar_ts,last_seen,is_banned').order('created_at', { ascending: true }).limit(5000)),
     run(sb.from('gifts').select(GIFT_COLS).order('ts', { ascending: true })),
     run(sb.from('received').select(RECV_COLS).order('ts', { ascending: false }).limit(5000)),
     run(sb.from('messages').select(MSG_COLS).order('ts', { ascending: false }).limit(200)),
     run(sb.from('dms').select(DM_COLS).or('from_uid.eq.' + u.id + ',to_uid.eq.' + u.id).order('ts', { ascending: false }).limit(500)),
-    getEco(u.id)
+    getEco(u.id),
+    myBlocks(u.id)
   ]);
   const received = {};
   recv.reverse().forEach(r => (received[r.user_id] = received[r.user_id] || []).push(outRecv(r)));
   return {
-    me: { id: u.id, nick: u.nick, owner: owner === u.id, coins: eco ? eco.coins : 0, lastDaily: eco ? Number(eco.last_daily) || 0 : 0 },
-    members: members.map(pubUser), gifts: gifts.map(outGift), received,
+    me: { id: u.id, nick: u.nick, owner: owner === u.id, banned: !!u.is_banned, coins: eco ? eco.coins : 0, lastDaily: eco ? Number(eco.last_daily) || 0 : 0 },
+    members: members.map(m => ({ ...pubUser(m), ls: Number(m.last_seen) || 0, on: isOnline(m.id) })), gifts: gifts.map(outGift), received,
+    blocked, bans: owner === u.id ? members.filter(m => m.is_banned).map(m => m.id) : [],
     messages: msgs.reverse().map(outMsg),
     dms: dms.reverse().map(outDm)
   };
@@ -172,8 +212,9 @@ async function api(req, res, url) {
     res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive', 'X-Accel-Buffering': 'no' });
     const c = { res, uid: u.id }; clients.add(c);
     const ka = setInterval(() => res.write(': ka\n\n'), 25000);
-    req.on('close', () => { clearInterval(ka); clients.delete(c); });
+    req.on('close', () => { clearInterval(ka); clients.delete(c); goOffline(u.id); });
     res.write(frame('init', init));
+    goOnline(u.id);
     return;
   }
   const am = /^\/api\/avatar\/([0-9a-f-]{36})$/i.exec(p);
@@ -232,6 +273,7 @@ async function api(req, res, url) {
     return send(res, 200, { ok: true });
   }
   if (p === '/api/send') {
+    if (u.is_banned) return send(res, 403, { error: BANNED_MSG });
     const text = clean(b.text, 1000); if (!text) return send(res, 400, { error: 'Пустое сообщение' });
     let rep = {};
     if (b.reply != null) {
@@ -244,11 +286,14 @@ async function api(req, res, url) {
     return send(res, 200, { ok: true, ...(await rewardChat(u.id) || {}) });
   }
   if (p === '/api/dm') {
+    if (u.is_banned) return send(res, 403, { error: BANNED_MSG });
     const text = clean(b.text, 1000);
     if (!UUID.test(String(b.to)) || b.to === u.id) return send(res, 400, { error: 'Выберите другого пользователя' });
     if (!text) return send(res, 400, { error: 'Пустое сообщение' });
     const to = await run(sb.from('users').select('id').eq('id', b.to).maybeSingle());
     if (!to) return send(res, 400, { error: 'Пользователь не найден' });
+    const bs = await blockState(u.id, to.id);
+    if (bs) return send(res, 403, { error: BLOCK_MSG[bs] });
     let rep = {};
     if (b.reply != null) {
       if (!UUID.test(String(b.reply))) return send(res, 400, { error: 'Исходное сообщение удалено' });
@@ -258,6 +303,36 @@ async function api(req, res, url) {
     const r = await run(sb.from('dms').insert({ from_uid: u.id, to_uid: to.id, text, ts: Date.now(), ...rep }).select(DM_COLS).single());
     toUsers('dm', outDm(r), [u.id, to.id]);
     return send(res, 200, { ok: true, ...(await rewardChat(u.id) || {}) });
+  }
+
+  /* ----- «печатает…»: лёгкое событие только собеседнику ----- */
+  if (p === '/api/typing') {
+    if (u.is_banned || !UUID.test(String(b.to)) || b.to === u.id) return send(res, 200, { ok: true });
+    const k = u.id + b.to, now = Date.now();
+    if (now - (typingAt.get(k) || 0) < 1000) return send(res, 200, { ok: true });   // не чаще раза в секунду
+    if (typingAt.size > 5000) typingAt.clear();
+    typingAt.set(k, now);
+    if (!(await blockState(u.id, b.to))) toUsers('typing', { from: u.id }, [b.to]);
+    return send(res, 200, { ok: true });
+  }
+
+  /* ----- личный чёрный список ----- */
+  if (p === '/api/block') {
+    if (!UUID.test(String(b.id)) || b.id === u.id || typeof b.block !== 'boolean') return send(res, 400, { error: 'Некорректный запрос' });
+    const t = await run(sb.from('users').select('id').eq('id', b.id).maybeSingle());
+    if (!t) return send(res, 404, { error: 'Пользователь не найден' });
+    if (b.block) {
+      const ex = await run(sb.from('blocked_users').select('blocker_id').eq('blocker_id', u.id).eq('blocked_id', t.id).maybeSingle());
+      if (!ex) {
+        const { error } = await sb.from('blocked_users').insert({ blocker_id: u.id, blocked_id: t.id, created_at: Date.now() });
+        if (error && error.code !== '23505') throw error;   // 23505: уже заблокирован (гонка), это нормально
+      }
+    } else {
+      await run(sb.from('blocked_users').delete().eq('blocker_id', u.id).eq('blocked_id', t.id));
+    }
+    const list = await myBlocks(u.id);
+    toUsers('blocks', { blocked: list }, [u.id]);   // обновит список на других устройствах; второй стороне ничего не отправляется
+    return send(res, 200, { ok: true, blocked: list });
   }
 
   /* ----- ежедневный бонус ----- */
@@ -274,6 +349,7 @@ async function api(req, res, url) {
 
   /* ----- покупка и отправка подарка: карточка приходит в ЛС получателя ----- */
   if (p === '/api/buy') {
+    if (u.is_banned) return send(res, 403, { error: BANNED_MSG });
     const isOwner = (await ownerId()) === u.id;
     return locked(async () => {
       if (!UUID.test(String(b.giftId)) || !UUID.test(String(b.to)) || b.to === u.id) return send(res, 400, { error: 'Выберите подарок и другого получателя' });
@@ -281,6 +357,8 @@ async function api(req, res, url) {
       const g = await run(sb.from('gifts').select(GIFT_COLS).eq('id', b.giftId).maybeSingle());
       const to = await run(sb.from('users').select('id,nick').eq('id', b.to).maybeSingle());
       if (!g || !to) return send(res, 404, { error: 'Подарок или получатель не найден' });
+      const bs = await blockState(u.id, to.id);
+      if (bs) return send(res, 403, { error: BLOCK_MSG[bs] });
       const price = g.price | 0, supply = g.supply | 0, sold = g.sold | 0;
       if (supply > 0 && sold >= supply) return send(res, 409, { error: 'Подарок распродан' });
       const free = b.free === true && isOwner;          // бесплатно может дарить только владелец
@@ -334,7 +412,7 @@ async function api(req, res, url) {
       if (error.code === '23505') return send(res, 409, { error: 'Ник «' + upd.nick + '» уже занят' });
       throw error;
     }
-    for (const [t, c] of sessCache) if (c.u.id === u.id) sessCache.delete(t);
+    dropSess(u.id);
     broadcast('profile', pubUser(r));
     return send(res, 200, { ok: true, me: pubUser(r) });
   }
@@ -355,6 +433,17 @@ async function api(req, res, url) {
   }
 
   if ((await ownerId()) !== u.id) return send(res, 403, { error: 'Только для владельца' });
+  /* ----- бан от владельца: нельзя писать в общий чат, в ЛС и дарить подарки ----- */
+  if (p === '/api/ban') {
+    if (!UUID.test(String(b.id)) || b.id === u.id || typeof b.ban !== 'boolean') return send(res, 400, { error: 'Нельзя забанить себя' });
+    const t = await run(sb.from('users').select('id,nick').eq('id', b.id).maybeSingle());
+    if (!t) return send(res, 404, { error: 'Пользователь не найден' });
+    await run(sb.from('users').update({ is_banned: b.ban }).eq('id', t.id));
+    dropSess(t.id);   // чтобы запрет подействовал сразу, а не через минуту
+    toUsers('ban', { banned: b.ban }, [t.id]);
+    toUsers('bans', { id: t.id, banned: b.ban }, [u.id]);
+    return send(res, 200, { ok: true, id: t.id, nick: t.nick, banned: b.ban });
+  }
   const num = (v, max) => { const n = Math.trunc(Number(v === '' || v == null ? 0 : v)); return Number.isFinite(n) && n >= 0 && n <= max ? n : null; };
   if (p === '/api/gifts') {
     const emoji = clean(b.emoji, 8), name = clean(b.name, 30), price = num(b.price, 1000000), supply = num(b.supply, 1000000);
