@@ -16,8 +16,7 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
   process.exit(1);
 }
 const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
-const WWW = path.join(__dirname, 'public');
-
+const WWW = path.join(__dirname, '..', 'app', 'www');
 
 const run = async p => { const { data, error } = await p; if (error) throw error; return data; };
 const rid = () => crypto.randomBytes(8).toString('hex');
@@ -27,6 +26,56 @@ const clean = (s, n) => String(s == null ? '' : s).trim().slice(0, n);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const fails = new Map();           // защита от подбора пароля (в памяти, это допустимо)
 const sessCache = new Map();       // token -> { u, exp }
+
+/* ---------- NFT-подарки: справочник оформления и шансы выпадения ---------- */
+// Шансы указаны в процентах, в каждой группе их сумма равна 100. Сервер проверяет это при запуске.
+const MODELS = [   // Модель: название, модификатор цвета эмодзи (CSS filter), значок, редкость
+  { name: 'Классика',   rarity: 50, mod: '',                                                                                       badge: '' },
+  { name: 'Золотая',    rarity: 25, mod: 'sepia(1) saturate(3) hue-rotate(-12deg) brightness(1.05)',                               badge: '✨' },
+  { name: 'Неоновая',   rarity: 15, mod: 'hue-rotate(140deg) saturate(2.6) brightness(1.15) drop-shadow(0 0 8px #00e5ff)',        badge: '⚡' },
+  { name: 'Алмазная',   rarity: 7,  mod: 'hue-rotate(185deg) saturate(1.7) brightness(1.3) contrast(1.1)',                         badge: '💎' },
+  { name: 'Мифическая', rarity: 3,  mod: 'hue-rotate(275deg) saturate(2.4) brightness(1.1) drop-shadow(0 0 10px #c026d3)',        badge: '🔮' }
+];
+const BACKGROUNDS = [   // Фон карточки: название, CSS-градиент, редкость
+  { name: 'Изумруд',           rarity: 30, gradient: 'linear-gradient(135deg,#0f9b6e,#46d39a)' },
+  { name: 'Сапфир',            rarity: 25, gradient: 'linear-gradient(135deg,#1e4fd8,#5aa9ff)' },
+  { name: 'Закат',             rarity: 20, gradient: 'linear-gradient(135deg,#ff6a3d,#ff3d81)' },
+  { name: 'Космос',            rarity: 15, gradient: 'linear-gradient(135deg,#0a0a2a,#1b1464 45%,#6a3cc9)' },
+  { name: 'Обсидиан',          rarity: 7,  gradient: 'linear-gradient(135deg,#0b0b0f,#2a2a35 60%,#4a4a5a)' },
+  { name: 'Радужный градиент', rarity: 3,  gradient: 'linear-gradient(135deg,#ff5f6d,#ffc371 25%,#47e891 50%,#4facfe 75%,#a855f7)' }
+];
+const PATTERNS = [   // Узор поверх фона: название, символ-повторитель, редкость
+  { name: 'Без узора', rarity: 35, symbol: '' },
+  { name: 'Звёзды',    rarity: 25, symbol: '✦' },
+  { name: 'Волны',     rarity: 18, symbol: '〰' },
+  { name: 'Соты',      rarity: 12, symbol: '⬡' },
+  { name: 'Кристаллы', rarity: 7,  symbol: '◆' },
+  { name: 'Фракталы',  rarity: 3,  symbol: '❋' }
+];
+for (const [n, list] of [['MODELS', MODELS], ['BACKGROUNDS', BACKGROUNDS], ['PATTERNS', PATTERNS]]) {
+  const sum = list.reduce((s, x) => s + x.rarity, 0);
+  if (Math.abs(sum - 100) > 1e-9) { console.error('Сумма шансов в ' + n + ' должна быть 100, сейчас ' + sum); process.exit(1); }
+}
+// Взвешенный случайный выбор (криптостойкий генератор, точность до 0,01%)
+function rollOne(list) {
+  const total = list.reduce((s, x) => s + Math.round(x.rarity * 100), 0);
+  let r = crypto.randomInt(0, total);
+  for (const x of list) { r -= Math.round(x.rarity * 100); if (r < 0) return x; }
+  return list[list.length - 1];
+}
+function rollTraits() {
+  const m = rollOne(MODELS), b = rollOne(BACKGROUNDS), p = rollOne(PATTERNS);
+  return {
+    model_name: m.name, model_rarity: m.rarity, model_mod: m.mod, model_badge: m.badge,
+    bg_name: b.name, bg_gradient: b.gradient, bg_rarity: b.rarity,
+    pattern_name: p.name, pattern_rarity: p.rarity, pattern_symbol: p.symbol
+  };
+}
+
+/* ---------- Маркет ---------- */
+const MARKET_FEE_PCT = Math.min(50, Math.max(0, Number(process.env.MARKET_FEE_PCT ?? 5) || 0));   // комиссия с продажи, % (по умолчанию 5)
+const MAX_PRICE = 100000000;
+const CATALOG = { models: MODELS, backgrounds: BACKGROUNDS, patterns: PATTERNS, feePct: MARKET_FEE_PCT, maxPrice: MAX_PRICE };
 
 /* ---------- Экономика: монеты ---------- */
 const START_COINS = 50, DAILY_COINS = 50, DAILY_MS = 24 * 3600 * 1000;
@@ -46,7 +95,7 @@ function toUsers(ev, data, ids) { const m = frame(ev, data); for (const c of cli
 const MSG_COLS = 'id,uid,type,text,to_uid,emoji,gname,ts,reply_to,reply_uid,reply_text';
 const DM_COLS = 'id,from_uid,to_uid,text,ts,reply_to,reply_uid,reply_text,kind,gift';
 const GIFT_COLS = 'id,emoji,name,ts,price,supply,sold';
-const RECV_COLS = 'id,user_id,gift_id,emoji,name,price,serial,supply,note,from_uid,ts';
+const RECV_COLS = 'id,user_id,gift_id,emoji,name,price,serial,supply,note,from_uid,ts,model_name,model_rarity,model_mod,model_badge,bg_name,bg_gradient,bg_rarity,pattern_name,pattern_rarity,pattern_symbol,is_listed,list_price,listed_at';
 const rp = r => r.reply_to ? { id: r.reply_to, uid: r.reply_uid, text: r.reply_text } : undefined;
 const outMsg = r => r.type === 'gift'
   ? { id: r.id, uid: r.uid, type: 'gift', to: r.to_uid, emoji: r.emoji, gname: r.gname, ts: r.ts, reply: rp(r) }
@@ -73,7 +122,15 @@ function okAvatar(a) {
   const buf = Buffer.from(m[1], 'base64');
   return buf.length <= 100000 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff;   // это действительно JPEG
 }
-const outRecv = r => ({ id: r.id, emoji: r.emoji, name: r.name, from: r.from_uid, ts: r.ts, price: r.price | 0, serial: r.serial | 0, supply: r.supply | 0, note: r.note || '' });
+// Подарок игрока: владелец, номер из тиража, модель/фон/узор (у старых подарков их нет) и статус на Маркете
+const outRecv = r => ({
+  id: r.id, owner: r.user_id, emoji: r.emoji, name: r.name, from: r.from_uid, ts: r.ts,
+  price: r.price | 0, serial: r.serial | 0, supply: r.supply | 0, note: r.note || '',
+  model: r.model_name ? { name: r.model_name, rarity: Number(r.model_rarity), mod: r.model_mod || '', badge: r.model_badge || '' } : undefined,
+  bg: r.bg_name ? { name: r.bg_name, gradient: r.bg_gradient || '', rarity: Number(r.bg_rarity) } : undefined,
+  pattern: r.pattern_name ? { name: r.pattern_name, rarity: Number(r.pattern_rarity), symbol: r.pattern_symbol || '' } : undefined,
+  listed: !!r.is_listed, listPrice: r.is_listed ? (r.list_price | 0) : 0
+});
 
 let ownerCache = null;
 async function ownerId() {
@@ -106,6 +163,22 @@ const getEco = id => run(sb.from('users').select(ECO_COLS).eq('id', id).maybeSin
 async function casUser(id, oldCoins, patch) {
   const rows = await run(sb.from('users').update(patch).eq('id', id).eq('coins', oldCoins).select('coins'));
   return rows && rows.length ? rows[0] : null;
+}
+// Начислить/списать монеты по «сравнить и поменять» (до 4 попыток); возвращает { coins, lastDaily } или null
+async function addCoins(id, delta) {
+  for (let i = 0; i < 4; i++) {
+    const r = await getEco(id); if (!r) return null;
+    const coins = Math.max(0, Math.min(MAX_COINS, r.coins + delta));
+    if (await casUser(id, r.coins, { coins })) return { coins, lastDaily: Number(r.last_daily) || 0 };
+  }
+  return null;
+}
+const itemOf = id => run(sb.from('received').select(RECV_COLS).eq('id', id).maybeSingle());
+const itemCard = it => ({ item: it.id, emoji: it.emoji, name: it.name, serial: it.serial, supply: it.supply, model: it.model, bg: it.bg, pattern: it.pattern });
+// Системное сообщение о сделке/передаче: одна запись в личной переписке двух участников, видят оба
+async function tradeNote(fromId, toId, text, gift) {
+  const dm = await run(sb.from('dms').insert({ from_uid: fromId, to_uid: toId, text, ts: Date.now(), kind: 'trade', gift }).select(DM_COLS).single());
+  toUsers('dm', outDm(dm), [fromId, toId]);
 }
 const pushCoins = (id, coins, lastDaily) => toUsers('coins', { coins, lastDaily: Number(lastDaily) || 0 }, [id]);
 // +2 монеты за сообщение: кулдаун 15 с и не более 100 монет в день
@@ -164,7 +237,7 @@ const dropSess = id => { for (const [t, c] of sessCache) if (c.u.id === id) sess
 const typingAt = new Map();
 
 async function initData(u) {
-  const [owner, members, gifts, recv, msgs, dms, eco, blocked] = await Promise.all([
+  const [owner, members, gifts, recv, msgs, dms, eco, blocked, listings] = await Promise.all([
     ownerId(),
     run(sb.from('users').select('id,nick,bio,avatar_ts,last_seen,is_banned').order('created_at', { ascending: true }).limit(5000)),
     run(sb.from('gifts').select(GIFT_COLS).order('ts', { ascending: true })),
@@ -172,13 +245,15 @@ async function initData(u) {
     run(sb.from('messages').select(MSG_COLS).order('ts', { ascending: false }).limit(200)),
     run(sb.from('dms').select(DM_COLS).or('from_uid.eq.' + u.id + ',to_uid.eq.' + u.id).order('ts', { ascending: false }).limit(500)),
     getEco(u.id),
-    myBlocks(u.id)
+    myBlocks(u.id),
+    run(sb.from('received').select(RECV_COLS).eq('is_listed', true).order('listed_at', { ascending: false }).limit(300))
   ]);
   const received = {};
   recv.reverse().forEach(r => (received[r.user_id] = received[r.user_id] || []).push(outRecv(r)));
   return {
     me: { id: u.id, nick: u.nick, owner: owner === u.id, banned: !!u.is_banned, coins: eco ? eco.coins : 0, lastDaily: eco ? Number(eco.last_daily) || 0 : 0 },
     members: members.map(m => ({ ...pubUser(m), ls: Number(m.last_seen) || 0, on: isOnline(m.id) })), gifts: gifts.map(outGift), received,
+    market: listings.map(outRecv), catalog: CATALOG,
     blocked, bans: owner === u.id ? members.filter(m => m.is_banned).map(m => m.id) : [],
     messages: msgs.reverse().map(outMsg),
     dms: dms.reverse().map(outDm)
@@ -226,6 +301,19 @@ async function api(req, res, url) {
     // адрес картинки содержит версию (?v=), поэтому её можно кэшировать надолго
     res.writeHead(200, { 'Content-Type': 'image/jpeg', 'Cache-Control': 'public, max-age=31536000, immutable' });
     return res.end(Buffer.from(mm[1], 'base64'));
+  }
+  /* ----- Маркет: лоты на продажу (последние, по цене, по виду подарка) ----- */
+  if (req.method === 'GET' && p === '/api/market') {
+    const u = await userOf(url.searchParams.get('token'));
+    if (!u) return send(res, 401, { error: 'Нужно войти' });
+    const sort = url.searchParams.get('sort'), gift = url.searchParams.get('gift');
+    const limit = Math.min(200, Math.max(1, Math.trunc(Number(url.searchParams.get('limit'))) || 100));
+    let q = sb.from('received').select(RECV_COLS).eq('is_listed', true);
+    if (gift && UUID.test(gift)) q = q.eq('gift_id', gift);
+    q = sort === 'price_asc' ? q.order('list_price', { ascending: true })
+      : sort === 'price_desc' ? q.order('list_price', { ascending: false })
+      : q.order('listed_at', { ascending: false });
+    return send(res, 200, { items: (await run(q.limit(limit))).map(outRecv) });
   }
   if (req.method === 'GET' && p === '/api/nick-free') {
     const u = await userOf(url.searchParams.get('token'));
@@ -378,8 +466,10 @@ async function api(req, res, url) {
       // 3) запись в профиль получателя и карточка в личные сообщения
       const ts = Date.now(); let rec = null, dm = null;
       try {
-        rec = await run(sb.from('received').insert({ user_id: to.id, gift_id: g.id, emoji: g.emoji, name: g.name, price, serial, supply: supply || null, note: note || null, from_uid: u.id, ts }).select(RECV_COLS).single());
-        const card = { id: g.id, emoji: g.emoji, name: g.name, price, serial, supply, note };
+        // при покупке экземпляру выпадают случайные модель, фон и узор (по весам редкости)
+        rec = await run(sb.from('received').insert({ user_id: to.id, gift_id: g.id, emoji: g.emoji, name: g.name, price, serial, supply: supply || null, note: note || null, from_uid: u.id, ts, ...rollTraits() }).select(RECV_COLS).single());
+        const o = outRecv(rec);
+        const card = { id: g.id, emoji: g.emoji, name: g.name, price, serial, supply, note, item: rec.id, model: o.model, bg: o.bg, pattern: o.pattern };
         dm = await run(sb.from('dms').insert({ from_uid: u.id, to_uid: to.id, text: '🎁 ' + g.name, ts, kind: 'gift', gift: card }).select(DM_COLS).single());
       } catch (e) {   // откат: вернуть монеты, номер и записи
         try { if (rec) await sb.from('received').delete().eq('id', rec.id); await sb.from('gifts').update({ sold }).eq('id', g.id).eq('sold', serial); } catch (e2) { console.error(e2); }
@@ -390,6 +480,125 @@ async function api(req, res, url) {
       broadcast('gift', outGift(claimed[0]));
       pushCoins(u.id, newCoins, me.last_daily);
       return send(res, 200, { ok: true, coins: newCoins, serial, supply });
+    });
+  }
+
+  /* ----- Маркет: выставить подарок на продажу ----- */
+  if (p === '/api/market/list') {
+    if (u.is_banned) return send(res, 403, { error: BANNED_MSG });
+    if (!UUID.test(String(b.itemId))) return send(res, 404, { error: 'Подарок не найден' });
+    const price = Math.trunc(Number(b.price));
+    if (!Number.isFinite(price) || price < 1 || price > MAX_PRICE) return send(res, 400, { error: 'Цена: целое число от 1 до ' + MAX_PRICE + ' монет' });
+    return locked(async () => {
+      const it = await itemOf(b.itemId);
+      if (!it) return send(res, 404, { error: 'Подарок не найден' });
+      if (it.user_id !== u.id) return send(res, 403, { error: 'Это не ваш подарок' });
+      if (it.is_listed) return send(res, 409, { error: 'Подарок уже выставлен на продажу' });
+      const rows = await run(sb.from('received').update({ is_listed: true, list_price: price, listed_at: Date.now() })
+        .eq('id', it.id).eq('user_id', u.id).eq('is_listed', false).select(RECV_COLS));
+      if (!rows.length) return send(res, 409, { error: 'Подарок уже выставлен на продажу' });
+      const item = outRecv(rows[0]);
+      broadcast('listing', { item });
+      return send(res, 200, { ok: true, item });
+    });
+  }
+  /* ----- Маркет: снять с продажи (в любой момент) ----- */
+  if (p === '/api/market/unlist') {
+    if (!UUID.test(String(b.itemId))) return send(res, 404, { error: 'Подарок не найден' });
+    return locked(async () => {
+      const it = await itemOf(b.itemId);
+      if (!it) return send(res, 404, { error: 'Подарок не найден' });
+      if (it.user_id !== u.id) return send(res, 403, { error: 'Это не ваш подарок' });
+      if (!it.is_listed) return send(res, 409, { error: 'Подарок не выставлен на продажу' });
+      const rows = await run(sb.from('received').update({ is_listed: false, list_price: null, listed_at: null })
+        .eq('id', it.id).eq('user_id', u.id).eq('is_listed', true).select(RECV_COLS));
+      if (!rows.length) return send(res, 409, { error: 'Лот уже недоступен' });
+      const item = outRecv(rows[0]);
+      broadcast('unlist', { item });
+      return send(res, 200, { ok: true, item });
+    });
+  }
+  /* ----- Маркет: купить лот за монеты ----- */
+  if (p === '/api/market/buy') {
+    if (u.is_banned) return send(res, 403, { error: BANNED_MSG });
+    if (!UUID.test(String(b.itemId))) return send(res, 404, { error: 'Лот не найден' });
+    return locked(async () => {
+      const it = await itemOf(b.itemId);
+      if (!it || !it.is_listed) return send(res, 409, { error: 'Лот уже недоступен: его купили или сняли с продажи' });
+      if (it.user_id === u.id) return send(res, 400, { error: 'Нельзя купить свой лот' });
+      const bs = await blockState(u.id, it.user_id);
+      if (bs) return send(res, 403, { error: BLOCK_MSG[bs] });
+      const seller = it.user_id, price = it.list_price | 0;
+      const fee = Math.floor(price * MARKET_FEE_PCT / 100), payout = price - fee;
+      const me = await getEco(u.id);
+      if (me.coins < price) return send(res, 402, { error: 'Не хватает монет: нужно ' + price + ', у вас ' + me.coins });
+      // 1) списываем монеты у покупателя
+      const paid = await casUser(u.id, me.coins, { coins: me.coins - price });
+      if (!paid) return send(res, 409, { error: 'Баланс изменился, попробуйте ещё раз' });
+      const refund = async () => { try { await addCoins(u.id, price); } catch (e) { console.error(e); } };
+      // 2) забираем лот: условное обновление срабатывает, только если он всё ещё продаётся этому продавцу по этой цене
+      let claimed;
+      try {
+        claimed = await run(sb.from('received').update({ user_id: u.id, is_listed: false, list_price: null, listed_at: null })
+          .eq('id', it.id).eq('user_id', seller).eq('is_listed', true).eq('list_price', price).select(RECV_COLS));
+      } catch (e) { await refund(); throw e; }
+      if (!claimed.length) { await refund(); return send(res, 409, { error: 'Лот уже недоступен: его купили или сняли с продажи' }); }
+      // 3) зачисляем деньги продавцу (за вычетом комиссии)
+      const credited = await addCoins(seller, payout);
+      if (!credited) {   // откат: вернуть подарок продавцу и деньги покупателю
+        try { await run(sb.from('received').update({ user_id: seller, is_listed: true, list_price: price, listed_at: it.listed_at }).eq('id', it.id).eq('user_id', u.id)); } catch (e) { console.error(e); }
+        await refund();
+        return send(res, 409, { error: 'Не удалось завершить сделку, попробуйте ещё раз' });
+      }
+      // 4) история и уведомления в ЛС; сделка уже завершена, поэтому сбой здесь только пишем в журнал
+      const item = outRecv(claimed[0]);
+      try { await run(sb.from('market_sales').insert({ item_id: it.id, seller_id: seller, buyer_id: u.id, price, fee, ts: Date.now() })); } catch (e) { console.error(e); }
+      try {
+        await tradeNote(u.id, seller, '🛒 Сделка: «' + it.name + '»' + (it.serial ? ' #' + it.serial : '') + ' за ' + price + ' 🪙',
+          { type: 'sale', ...itemCard(item), price, fee, payout, seller, buyer: u.id });
+      } catch (e) { console.error(e); }
+      broadcast('sold', { item, from: seller, to: u.id, price, fee });
+      pushCoins(u.id, paid.coins, me.last_daily);
+      pushCoins(seller, credited.coins, credited.lastDaily);
+      return send(res, 200, { ok: true, coins: paid.coins, item });
+    });
+  }
+  /* ----- Передать подарок другому игроку (нельзя, пока он стоит на продаже) ----- */
+  if (p === '/api/nft/transfer') {
+    if (u.is_banned) return send(res, 403, { error: BANNED_MSG });
+    if (!UUID.test(String(b.itemId))) return send(res, 404, { error: 'Подарок не найден' });
+    if (!UUID.test(String(b.to)) || b.to === u.id) return send(res, 400, { error: 'Выберите другого получателя' });
+    return locked(async () => {
+      const it = await itemOf(b.itemId);
+      if (!it) return send(res, 404, { error: 'Подарок не найден' });
+      if (it.user_id !== u.id) return send(res, 403, { error: 'Это не ваш подарок' });
+      if (it.is_listed) return send(res, 409, { error: 'Подарок стоит на продаже: сначала снимите его с продажи' });
+      const to = await run(sb.from('users').select('id,nick').eq('id', b.to).maybeSingle());
+      if (!to) return send(res, 404, { error: 'Получатель не найден' });
+      const bs = await blockState(u.id, to.id);
+      if (bs) return send(res, 403, { error: BLOCK_MSG[bs] });
+      const rows = await run(sb.from('received').update({ user_id: to.id }).eq('id', it.id).eq('user_id', u.id).eq('is_listed', false).select(RECV_COLS));
+      if (!rows.length) return send(res, 409, { error: 'Подарок уже недоступен для передачи' });
+      const item = outRecv(rows[0]);
+      try { await tradeNote(u.id, to.id, '🎁 Передача: «' + it.name + '»' + (it.serial ? ' #' + it.serial : ''), { type: 'transfer', ...itemCard(item), from: u.id, to: to.id }); } catch (e) { console.error(e); }
+      broadcast('transfer', { item, from: u.id, to: to.id });
+      return send(res, 200, { ok: true, item });
+    });
+  }
+  /* ----- Улучшить старый подарок: бросить модель, фон и узор (только если их ещё нет) ----- */
+  if (p === '/api/nft/roll') {
+    if (!UUID.test(String(b.itemId))) return send(res, 404, { error: 'Подарок не найден' });
+    return locked(async () => {
+      const it = await itemOf(b.itemId);
+      if (!it) return send(res, 404, { error: 'Подарок не найден' });
+      if (it.user_id !== u.id) return send(res, 403, { error: 'Это не ваш подарок' });
+      if (it.model_name) return send(res, 409, { error: 'У этого подарка уже есть модель и фон' });
+      if (it.is_listed) return send(res, 409, { error: 'Подарок стоит на продаже: сначала снимите его с продажи' });
+      const rows = await run(sb.from('received').update(rollTraits()).eq('id', it.id).eq('user_id', u.id).eq('is_listed', false).is('model_name', null).select(RECV_COLS));
+      if (!rows.length) return send(res, 409, { error: 'У этого подарка уже есть модель и фон' });
+      const item = outRecv(rows[0]);
+      broadcast('rolled', { item });
+      return send(res, 200, { ok: true, item });
     });
   }
 
