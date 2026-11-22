@@ -16,7 +16,8 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
   process.exit(1);
 }
 const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
-const WWW = path.join(__dirname, '..', 'app', 'www');
+const WWW = path.join(__dirname, 'public');
+
 
 const run = async p => { const { data, error } = await p; if (error) throw error; return data; };
 const rid = () => crypto.randomBytes(8).toString('hex');
