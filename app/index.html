@@ -79,7 +79,7 @@ main.vin{animation:viewin .26s ease-out}
 .sg:hover{transform:translateY(-2px);box-shadow:var(--sh1),0 10px 26px rgba(14,22,33,.12)}
 .sg .e{font-size:52px;line-height:1.1;filter:drop-shadow(0 6px 10px rgba(0,0,0,.16))}.sg .gn{font-weight:600}.sg .pr{font-weight:700;font-size:16px}
 .sg .lf{font-size:13px;color:var(--mu)}.sg .lf.low{color:#ef4444;font-weight:600}.sg button{margin-top:auto}.sg.out{opacity:.6}
-.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(116px,1fr));gap:10px}
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
 .pgrid .gc{padding:10px 8px}.pgrid .gc .e{font-size:38px}.pgrid .gc .gn{font-size:13.5px}
 .bal{font-size:15px;margin-bottom:10px}.bal b{font-size:24px;font-weight:700}
 .dbal{display:inline-block;width:fit-content;margin-top:4px;padding:4px 13px;border-radius:14px;background:rgba(255,255,255,.2);font-size:15px;font-weight:600}
@@ -94,7 +94,7 @@ input.f::placeholder,.sheet textarea::placeholder{color:var(--mu)}
 select{appearance:auto}
 button.p{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:0 20px;box-sizing:border-box;border:0;border-radius:14px;background:linear-gradient(180deg,var(--ac1),var(--ac2));color:#fff;font-size:15.5px;font-weight:600;cursor:pointer;box-shadow:0 5px 16px rgba(47,127,240,.32);transition:transform .1s,filter .15s,opacity .15s}
 button.p:hover{filter:brightness(1.05)}button.p:active{transform:scale(.97)}button.p:disabled{opacity:.5;cursor:default;box-shadow:none;transform:none;filter:none}
-button.p.w{width:100%}
+button.p.w,button.g2.w{width:100%}
 button.g2{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:0 20px;box-sizing:border-box;border:0;border-radius:14px;background:var(--hov);color:var(--tx);font-size:15.5px;font-weight:600;cursor:pointer;transition:transform .1s,background .15s}
 button.g2:active{transform:scale(.97)}
 button.s{min-height:40px;padding:0 12px;background:none;border:0;border-radius:12px;color:var(--mu);cursor:pointer;font-size:13.5px;flex:none;transition:background .15s,color .15s}
@@ -158,6 +158,40 @@ footer{padding:8px 10px 10px;display:flex;gap:8px;align-items:flex-end}
 button.g2.danger{color:#ef4444}
 #nbar{display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--glass);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border-top:1px solid var(--bd);font-size:14.5px;animation:sheetup .2s ease-out}
 #nbar .nt{flex:1;min-width:0}#nbar button{min-height:42px;padding:0 16px;flex:none}
+.nft{position:relative;overflow:hidden;border-radius:18px;padding:30px 12px 12px;text-align:center;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.42);background:linear-gradient(160deg,#7c6cf0,#e56fb0);box-shadow:0 6px 18px rgba(0,0,0,.2)}
+.nft>*{position:relative}
+.nft>.pat{position:absolute;inset:-25%;font-size:20px;line-height:1.75;letter-spacing:7px;opacity:.17;transform:rotate(-14deg);overflow:hidden;word-break:break-all;pointer-events:none;user-select:none;text-shadow:none}
+.nft>.bdg{position:absolute;top:8px;right:10px;font-size:19px}
+.nft>.rib{position:absolute;top:8px;left:8px;padding:2px 8px;border-radius:9px;font-size:9.5px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;text-shadow:none}
+.nft .e{font-size:58px;line-height:1.15;margin-top:0;filter:drop-shadow(0 6px 10px rgba(0,0,0,.3))}
+.nft .gn{font-weight:700;font-size:16px;margin-top:2px}
+.nft .num{display:inline-block;margin:5px 0 2px;padding:2px 11px;border-radius:10px;background:rgba(0,0,0,.3);font-size:12.5px;font-weight:700}
+.nft .trow{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;column-gap:8px;margin-top:5px;text-align:left;background:rgba(0,0,0,.26);border-radius:10px;padding:4px 6px 4px 9px;text-shadow:none}
+.nft .trow .tk{grid-column:1;grid-row:1;font-size:9.5px;letter-spacing:.5px;text-transform:uppercase;opacity:.72}.nft .trow .tv{grid-column:1;grid-row:2;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13px;font-weight:700}.nft .trow .tr{grid-column:2;grid-row:1/3}
+.nft .gnote{font-style:italic;margin-top:8px;font-size:13.5px}.nft .gfrom{font-size:11.5px;opacity:.8;margin-top:6px}
+.nft.legend::after{content:"";position:absolute;inset:0;background:linear-gradient(115deg,transparent 32%,rgba(255,255,255,.38) 50%,transparent 68%);transform:translateX(-120%);animation:shine 3.4s ease-in-out infinite;pointer-events:none}
+@keyframes shine{0%{transform:translateX(-120%)}60%,100%{transform:translateX(120%)}}
+.tr{flex:none;font-weight:700;font-size:12px;border-radius:8px;padding:1px 8px;color:#fff;text-shadow:none}
+.t1{background:#e6a800;color:#2b1d00!important}.t2{background:#9333ea}.t3{background:#2563eb}.t4{background:#16a34a}.t5{background:#6b7280}
+.icell{display:flex;flex-direction:column;gap:6px}.icell .gfrom{font-size:12px;color:var(--mu);text-align:center}
+.icell .lst{font-size:13px;font-weight:600;text-align:center;color:var(--ac)}
+.lform{display:flex;flex-direction:column;gap:6px}.lform .fr{gap:6px}.lform .fr>*{flex:1 1 0}
+.seg{display:flex;gap:4px;background:var(--hov);border-radius:16px;padding:4px;max-width:640px;margin:0 auto 14px}
+.seg button{flex:1;min-height:44px;border:0;border-radius:12px;background:none;color:var(--mu);font-size:15.5px;font-weight:600;cursor:pointer;transition:background .2s,color .2s,box-shadow .2s}
+.seg button.on{background:var(--card);color:var(--tx);box-shadow:var(--sh1)}
+.mkgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(165px,1fr));gap:12px;max-width:760px;margin:0 auto 14px}
+.mk{background:var(--card);border-radius:22px;padding:10px;display:flex;flex-direction:column;gap:7px;box-shadow:var(--sh1);transition:transform .18s,box-shadow .18s}
+.mk:hover{transform:translateY(-2px);box-shadow:var(--sh1),0 10px 26px rgba(14,22,33,.14)}
+.mk button.p,.mk button.g2,.icell button.p,.icell button.g2{padding:0 8px;font-size:14.5px;white-space:nowrap}
+.mk-s{font-size:13px;color:var(--mu);text-align:center}.mk-p{font-size:20px;font-weight:800;text-align:center}
+.lnk{background:none;border:0;color:var(--ac);font:inherit;font-weight:600;cursor:pointer;padding:0}
+.card details summary{cursor:pointer;font-weight:600;min-height:44px;display:flex;align-items:center}
+.oh{margin:12px 0 4px;font-weight:700;font-size:12.5px;color:var(--mu);text-transform:uppercase;letter-spacing:.5px}
+.orow{display:flex;align-items:center;gap:10px;padding:5px 0;font-size:14.5px}.orow .on{flex:1}.osw{width:34px;height:18px;border-radius:6px;flex:none}
+.row.sys{justify-content:center;margin:8px 0}
+.bub.sysb{max-width:min(88%,320px);cursor:default;background:var(--card);color:var(--tx);padding:10px;border-radius:22px;text-align:center;box-shadow:var(--sh1),0 0 0 1px var(--bd)}
+.bub.sysb:active{transform:none}.sysb .sh{font-size:13.5px;font-weight:600;margin:2px 4px 9px;line-height:1.35}
+.sysb .ts{float:none;display:block;text-align:center;margin:7px 0 0;color:var(--mu)}
 [hidden]{display:none!important}
 </style>
 </head>
@@ -179,7 +213,7 @@ button.g2.danger{color:#ef4444}
 <div id="sov" hidden><div class="sheet" id="sheet"></div></div>
 <div class="menu" id="menu" hidden></div><div class="toast" id="toast" hidden></div>
 <script>
-const S={typing:{},blocked:{},banned:{},isBanned:false,coins:0,lastDaily:0,armed:"",dirty:false,preview:false,U:{},view:"chat",open:false,q:"",reply:null,msgs:[],dms:[],read:{},gifts:[],members:[],recv:{},nick:{},me:null,owner:false,auth:"load",mode:"login",err:"",form:{emoji:"🎁",name:"",price:"",supply:"",cnick:"",camt:"",to:"",note:"",free:false}};
+const S={market:[],catalog:null,shopTab:"shop",mkSort:"new",lst:null,oddsOpen:false,typing:{},blocked:{},banned:{},isBanned:false,coins:0,lastDaily:0,armed:"",dirty:false,preview:false,U:{},view:"chat",open:false,q:"",reply:null,msgs:[],dms:[],read:{},gifts:[],members:[],recv:{},nick:{},me:null,owner:false,auth:"load",mode:"login",err:"",form:{emoji:"🎁",name:"",price:"",supply:"",cnick:"",camt:"",to:"",note:"",free:false}};
 const $=s=>document.querySelector(s);
 function el(t,c,x){const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e}
 function nm(id){return S.nick[id]||"Участник"}
@@ -232,7 +266,7 @@ function side(){
   }
 }
 function head(){
-  let T;if(S.view.startsWith("dm:")){const id=S.view.slice(3);T=[ini(id),`hsl(${hs(id)%360} 50% 48%)`,nm(id),"личные сообщения"]}else T={chat:["💬","#3390ec","Общий чат",pl(S.members.length,"участник","участника","участников")],shop:["🎁","#e17076","Магазин подарков","Баланс: "+fmt(S.coins)+" 🪙"],admin:["⚙","#7bc862","Админ","Только для владельца"]}[S.view];
+  let T;if(S.view.startsWith("dm:")){const id=S.view.slice(3);T=[ini(id),`hsl(${hs(id)%360} 50% 48%)`,nm(id),"личные сообщения"]}else T={chat:["💬","#3390ec","Общий чат",pl(S.members.length,"участник","участника","участников")],shop:["🎁","#e17076",S.shopTab==="market"?"Маркет подарков":"Магазин подарков",S.shopTab==="market"?"Лотов: "+S.market.length+" · баланс "+fmt(S.coins)+" 🪙":"Баланс: "+fmt(S.coins)+" 🪙"],admin:["⚙","#7bc862","Админ","Только для владельца"]}[S.view];
   const dmId=S.view.startsWith("dm:")?S.view.slice(3):null;
   const a=$("#hav");a.textContent="";a.appendChild(dmId?avOn(dmId,1):av("h",T[0],1,T[1]));$("#ht").textContent=T[2];setHs(dmId,T[3]);
   const hc=$("#hdc");hc.style.cursor=dmId?"pointer":"default";hc.onclick=dmId?()=>openProfile(dmId):null;
@@ -243,6 +277,11 @@ function chat(m,list,dm){
   let pd="",pu=null;
   list.forEach(x=>{
     const d=dy(x.ts);if(d!==pd){const s=el("div","sep");s.appendChild(el("span","",d));m.appendChild(s);pd=d;pu=null}
+    if(x.type==="trade"&&x.gift){
+      const rs=el("div","row sys"),bs=el("div","bub sysb");rs.dataset.id=x.id;
+      bs.appendChild(el("div","sh",tradeText(x.gift)));bs.appendChild(gcard(x.gift));bs.appendChild(el("span","ts",tm(x.ts)));
+      rs.appendChild(bs);m.appendChild(rs);pu=null;return;
+    }
     const me=x.uid===S.me,r=el("div","row"+(me?" me":""));r.dataset.id=x.id;
     if(!me&&!dm)r.appendChild(pu===x.uid&&x.type!=="gift"?el("div","av s"):pav(x.uid));
     const b=el("div","bub");
@@ -257,12 +296,36 @@ function chat(m,list,dm){
 }
 const fmt=n=>Number(n||0).toLocaleString("ru");
 function sup(g){return g.supply>0?"Осталось: "+Math.max(0,g.supply-g.sold)+" из "+g.supply:"Без лимита"}
+/* ---- NFT-подарки: редкость, красивая карточка, сделки ---- */
+function tier(r){r=Number(r);return r<=3?["Легендарная","t1"]:r<=7?["Эпическая","t2"]:r<=15?["Редкая","t3"]:r<=25?["Необычная","t4"]:["Обычная","t5"]}
 function gcard(i){
-  const c=el("div","gc");c.appendChild(el("div","e",i.emoji));c.appendChild(el("div","gn",i.name));
-  const meta=[];if(i.price>0)meta.push(fmt(i.price)+" 🪙");if(i.serial)meta.push("#"+i.serial+(i.supply>0?" из "+i.supply:""));
-  if(meta.length)c.appendChild(el("div","gm",meta.join(" · ")));
+  const c=el("div","nft");
+  if(i.bg&&i.bg.gradient)c.style.background=i.bg.gradient;
+  if(i.pattern&&i.pattern.symbol){const pt=el("div","pat",(i.pattern.symbol+" ").repeat(90));pt.setAttribute("aria-hidden","true");c.appendChild(pt)}
+  const tr=[i.model,i.bg,i.pattern].filter(Boolean);
+  if(tr.length){const mr=Math.min(...tr.map(x=>Number(x.rarity)||100)),t=tier(mr);c.appendChild(el("div","rib "+t[1],t[0]));if(mr<=3)c.classList.add("legend")}
+  if(i.model&&i.model.badge)c.appendChild(el("div","bdg",i.model.badge));
+  const e=el("div","e",i.emoji);if(i.model&&i.model.mod)e.style.filter=i.model.mod+" drop-shadow(0 6px 10px rgba(0,0,0,.3))";c.appendChild(e);
+  c.appendChild(el("div","gn",i.name));
+  const nums=[];if(i.serial)nums.push("#"+i.serial+(i.supply>0?" из "+i.supply:""));if(i.price>0)nums.push(fmt(i.price)+" 🪙");
+  if(nums.length)c.appendChild(el("div","num",nums.join(" · ")));
+  [["Модель",i.model],["Фон",i.bg],["Узор",i.pattern]].forEach(([k,t])=>{
+    if(!t)return;const r=el("div","trow");r.appendChild(el("span","tk",k));r.appendChild(el("span","tv",t.name));
+    const p=el("span","tr "+tier(t.rarity)[1],t.rarity+"%");p.title=tier(t.rarity)[0]+": выпадает у "+t.rarity+"% подарков";r.appendChild(p);c.appendChild(r);
+  });
   if(i.note)c.appendChild(el("div","gnote","«"+i.note+"»"));
   return c;
+}
+function tradeText(g){
+  const n="«"+g.name+"»"+(g.serial?" #"+g.serial:"");
+  if(g.type==="sale"){
+    if(S.me===g.buyer)return "🛒 Вы купили "+n+" у "+nm(g.seller)+" за "+fmt(g.price)+" 🪙";
+    if(S.me===g.seller)return "💰 Вы продали "+n+" пользователю "+nm(g.buyer)+" за "+fmt(g.price)+" 🪙 (комиссия "+fmt(g.fee)+", получено "+fmt(g.payout)+" 🪙)";
+    return "🛒 Сделка: "+n+" за "+fmt(g.price)+" 🪙";
+  }
+  if(S.me===g.to)return "🎁 "+nm(g.from)+" передал(а) вам "+n;
+  if(S.me===g.from)return "🎁 Вы передали "+n+" пользователю "+nm(g.to);
+  return "🎁 Передача: "+n;
 }
 function inp(ph,key,w,num){const i=el("input","f");i.placeholder=ph;i.value=S.form[key];i.oninput=()=>S.form[key]=i.value;if(w)i.maxLength=w;if(num){i.type="number";i.min=0;i.inputMode="numeric"}return i}
 function sel(key,opts,ph){const s=el("select");s.appendChild(new Option(ph,""));opts.forEach(([v,l])=>s.appendChild(new Option(l,v)));s.value=S.form[key];s.onchange=()=>{S.form[key]=s.value;render(true)};return s}
@@ -283,7 +346,7 @@ function refreshCoins(){
   if(!$("#sov").hidden&&sheetMode==="view"&&sheetFor===S.me)openProfile(S.me);
   if($("#drawer").classList.contains("on"))openDrawer();
 }
-function shop(m){
+function store(m){
   const top=el("div","card");top.appendChild(el("h2","","Магазин подарков"));
   const bal=el("div","bal");bal.appendChild(document.createTextNode("Ваш баланс: "));bal.appendChild(el("b","",fmt(S.coins)+" 🪙"));top.appendChild(bal);
   top.appendChild(dailyBtn());m.appendChild(top);
@@ -291,7 +354,7 @@ function shop(m){
   c0.appendChild(fld("Кому отправить",sel("to",S.members.filter(i=>i!==S.me).map(i=>[i,nm(i)]),"Выберите получателя")));
   c0.appendChild(fld("Подпись к подарку (необязательно)",inp("Например: с днём рождения!","note",80)));
   if(S.owner){const l=el("label","chk"),c=el("input");c.type="checkbox";c.checked=!!S.form.free;c.onchange=()=>{S.form.free=c.checked;render(true)};l.appendChild(c);l.appendChild(document.createTextNode("Бесплатно (подарок от владельца)"));c0.appendChild(l)}
-  c0.appendChild(el("div","mu","Карточка подарка придёт получателю в личные сообщения."));
+  c0.appendChild(el("div","mu","Карточка подарка придёт получателю в личные сообщения. 🎲 Модель, фон и узор выпадают случайно, чем реже вариант, тем ценнее подарок."));
   m.appendChild(c0);
   if(!S.gifts.length)m.appendChild(el("div","note","Каталог пока пуст."));
   const grid=el("div","shopgrid");
@@ -310,6 +373,7 @@ function shop(m){
     d.appendChild(b);grid.appendChild(d);
   });
   m.appendChild(grid);
+  odds(m);
 }
 let armT=null;
 function arm(k){S.armed=k;clearTimeout(armT);armT=setTimeout(()=>{if(S.armed===k){S.armed="";render(true)}},4000);render(true)}
@@ -323,6 +387,113 @@ async function buy(g){
     S.view="dm:"+to;S.open=true;render(true);   // показываем карточку в личном чате
   }catch(e){fail(e)}
   finally{buying=false}
+}
+/* ---- вкладки «Магазин / Маркет», лоты, сделки ---- */
+function shop(m){
+  const sg=el("div","seg");
+  [["shop","🎁 Магазин"],["market","🛒 Маркет"+(S.market.length?" · "+S.market.length:"")]].forEach(([k,l])=>{
+    const b=el("button",S.shopTab===k?"on":"",l);b.onclick=()=>{S.shopTab=k;S.armed="";render(true)};sg.appendChild(b);
+  });
+  m.appendChild(sg);
+  if(S.shopTab==="market")market(m);else store(m);
+}
+const feePct=()=>(S.catalog&&S.catalog.feePct)||0;
+function odds(m){
+  if(!S.catalog)return;
+  const c=el("div","card"),d=el("details");d.open=!!S.oddsOpen;d.ontoggle=()=>{S.oddsOpen=d.open};
+  d.appendChild(el("summary","","🎲 Шансы выпадения модели, фона и узора"));
+  [["Модели",S.catalog.models],["Фоны",S.catalog.backgrounds],["Узоры",S.catalog.patterns]].forEach(([t,l])=>{
+    d.appendChild(el("div","oh",t));
+    l.forEach(x=>{
+      const r=el("div","orow");
+      if(x.gradient){const sw=el("span","osw");sw.style.background=x.gradient;r.appendChild(sw)}
+      r.appendChild(el("span","on",x.name+(x.badge?" "+x.badge:x.symbol?" "+x.symbol:"")));
+      const p=el("span","tr "+tier(x.rarity)[1],x.rarity+"%");p.title=tier(x.rarity)[0];r.appendChild(p);d.appendChild(r);
+    });
+  });
+  c.appendChild(d);m.appendChild(c);
+}
+function market(m){
+  const top=el("div","card");top.appendChild(el("h2","","Маркет подарков"));
+  const bal=el("div","bal");bal.appendChild(document.createTextNode("Ваш баланс: "));bal.appendChild(el("b","",fmt(S.coins)+" 🪙"));top.appendChild(bal);
+  top.appendChild(el("div","mu","Игроки перепродают подарки друг другу. Комиссия Маркета "+feePct()+"%: продавец получает цену минус комиссия. Номер «#N из тиража», модель, фон и узор при перепродаже сохраняются."));
+  const so=el("select");[["new","Сначала новые"],["price_asc","Сначала дешёвые"],["price_desc","Сначала дорогие"]].forEach(([v,l])=>so.appendChild(new Option(l,v)));
+  so.value=S.mkSort;so.onchange=()=>{S.mkSort=so.value;render(true)};
+  const f=fld("Сортировка",so);f.style.marginTop="10px";top.appendChild(f);
+  m.appendChild(top);
+  const list=S.market.slice();
+  if(S.mkSort==="price_asc")list.sort((a,b)=>a.listPrice-b.listPrice);else if(S.mkSort==="price_desc")list.sort((a,b)=>b.listPrice-a.listPrice);
+  if(!list.length){m.appendChild(el("div","note","На Маркете пока нет лотов. Выставьте свой подарок из профиля."));return}
+  const g=el("div","mkgrid");list.forEach(it=>g.appendChild(lotCard(it)));m.appendChild(g);
+}
+function lotCard(it){
+  const c=el("div","mk");c.appendChild(gcard(it));
+  const sl=el("div","mk-s");sl.appendChild(document.createTextNode("Продавец: "));
+  const a=el("button","lnk",nm(it.owner));a.onclick=()=>openProfile(it.owner);sl.appendChild(a);c.appendChild(sl);
+  c.appendChild(el("div","mk-p",fmt(it.listPrice)+" 🪙"));
+  if(it.owner===S.me){const b=el("button","g2 w","Снять с продажи");b.onclick=()=>unlistItem(it);c.appendChild(b)}
+  else{
+    const short=S.coins<it.listPrice,b=el("button","p w",S.isBanned?"Недоступно":short?"Не хватает монет":"Купить за "+fmt(it.listPrice)+" 🪙");
+    b.disabled=short||S.isBanned;b.onclick=()=>confirmBuy(b,it);c.appendChild(b);
+  }
+  return c;
+}
+// двойное нажатие: первый клик просит подтверждение, второй покупает
+function confirmBuy(b,it){
+  if(!b.dataset.a){
+    b.dataset.a="1";b.textContent="Подтвердить −"+fmt(it.listPrice)+" 🪙";
+    setTimeout(()=>{if(b.isConnected&&b.dataset.a){delete b.dataset.a;b.textContent="Купить за "+fmt(it.listPrice)+" 🪙"}},4000);
+    return;
+  }
+  buyLot(it);
+}
+// единый способ обновить состояние подарка из ответа сервера или события
+function applyItem(it){
+  for(const k of Object.keys(S.recv)){
+    const a=S.recv[k],j=a.findIndex(x=>x.id===it.id);
+    if(j>=0){if(k===it.owner)a[j]=it;else a.splice(j,1)}
+  }
+  const own=S.recv[it.owner]||(S.recv[it.owner]=[]);
+  if(!own.some(x=>x.id===it.id))own.push(it);
+  const j=S.market.findIndex(x=>x.id===it.id);
+  if(it.listed){if(j>=0)S.market[j]=it;else S.market.unshift(it)}else if(j>=0)S.market.splice(j,1);
+}
+function refreshItems(){render();if(!$("#sov").hidden&&sheetMode==="view"&&sheetFor)openProfile(sheetFor)}
+let mkBusy=false;
+async function mkCall(path,body,done){
+  if(mkBusy)return;mkBusy=true;
+  try{const r=await api(path,body);if(r.coins!==undefined)S.coins=r.coins;if(r.item)applyItem(r.item);if(done)done(r);refreshItems()}
+  catch(e){fail(e)}finally{mkBusy=false}
+}
+const buyLot=it=>mkCall("/api/market/buy",{itemId:it.id},()=>toast("Куплено: "+it.emoji+" "+it.name+(it.serial?" #"+it.serial:"")));
+const unlistItem=it=>mkCall("/api/market/unlist",{itemId:it.id},()=>toast("Снято с продажи"));
+const listItem=(it,price)=>mkCall("/api/market/list",{itemId:it.id,price},()=>{S.lst=null;toast("Выставлено на Маркет за "+fmt(price)+" 🪙")});
+const rollItem=it=>mkCall("/api/nft/roll",{itemId:it.id},()=>toast("🎲 Выпали модель, фон и узор!"));
+// ячейка подарка в профиле: карточка + действия (в своём профиле — продажа, в чужом — покупка лота)
+function itemCell(i){
+  const w=el("div","icell");w.appendChild(gcard(i));
+  w.appendChild(el("div","gfrom","от "+nm(i.from)));
+  const mine=i.owner===S.me;
+  if(i.listed){
+    w.appendChild(el("div","lst","🛒 На Маркете: "+fmt(i.listPrice)+" 🪙"));
+    if(mine){const b=el("button","g2 w","Снять с продажи");b.onclick=()=>unlistItem(i);w.appendChild(b)}
+    else{const short=S.coins<i.listPrice,b=el("button","p w",S.isBanned?"Недоступно":short?"Не хватает монет":"Купить за "+fmt(i.listPrice)+" 🪙");b.disabled=short||S.isBanned;b.onclick=()=>confirmBuy(b,i);w.appendChild(b)}
+  }else if(mine){
+    if(S.lst&&S.lst.id===i.id){
+      const f=el("div","lform"),inpE=el("input","f");inpE.type="number";inpE.min=1;inpE.inputMode="numeric";inpE.placeholder="Цена в монетах";inpE.value=S.lst.price;
+      const info=el("div","mu");
+      const upd=()=>{const v=Math.trunc(Number(inpE.value));info.textContent=v>0?"Вы получите "+fmt(v-Math.floor(v*feePct()/100))+" 🪙 (комиссия "+feePct()+"%)":"Комиссия Маркета "+feePct()+"%"};
+      inpE.oninput=()=>{S.lst.price=inpE.value;upd()};upd();
+      const row=el("div","fr"),ok=el("button","p","Выставить"),no=el("button","g2","Отмена");
+      ok.onclick=()=>{const v=Math.trunc(Number(inpE.value));if(!(v>=1))return toast("Укажите цену в монетах");listItem(i,v)};
+      no.onclick=()=>{S.lst=null;openProfile(S.me)};
+      row.appendChild(ok);row.appendChild(no);f.appendChild(inpE);f.appendChild(info);f.appendChild(row);w.appendChild(f);
+    }else{
+      const b=el("button","p w","Выставить на Маркет");b.onclick=()=>{S.lst={id:i.id,price:""};openProfile(S.me)};w.appendChild(b);
+      if(!i.model){const r=el("button","g2 w","🎲 Получить модель и фон");r.onclick=()=>rollItem(i);w.appendChild(r)}
+    }
+  }
+  return w;
 }
 function admin(m){
   const c=el("div","card");c.appendChild(el("h2","","Выпустить новый подарок"));
@@ -409,7 +580,7 @@ function render(force){
   m.textContent="";
   if(lastView!==S.view){lastView=S.view;m.classList.remove("vin");void m.offsetWidth;m.classList.add("vin")}
   if(S.view==="chat")chat(m,S.msgs,false);
-  else if(dmv)chat(m,th.map(x=>x.kind==="gift"&&x.gift?{id:x.id,uid:x.from,type:"giftcard",gift:x.gift,text:x.text,ts:x.ts,reply:x.reply}:{id:x.id,uid:x.from,type:"text",text:x.text,ts:x.ts,reply:x.reply}),true);
+  else if(dmv)chat(m,th.map(x=>x.kind==="trade"&&x.gift?{id:x.id,uid:x.from,type:"trade",gift:x.gift,text:x.text,ts:x.ts}:x.kind==="gift"&&x.gift?{id:x.id,uid:x.from,type:"giftcard",gift:x.gift,text:x.text,ts:x.ts,reply:x.reply}:{id:x.id,uid:x.from,type:"text",text:x.text,ts:x.ts,reply:x.reply}),true);
   else if(S.view==="shop")shop(m);else admin(m);
   if(keep!==null)m.scrollTop=keep;
   if((S.view==="chat"||dmv)&&(near||first||force))m.scrollTop=m.scrollHeight;
@@ -422,7 +593,7 @@ async function send(){
   const rp=S.reply&&S.reply.view===S.view?S.reply.id:undefined;
   try{await api(dmv?"/api/dm":"/api/send",dmv?{to:S.view.slice(3),text:t,reply:rp}:{text:t,reply:rp});S.reply=null;showReply()}catch(e){i.value=i.value||t;fail(e)}
 }
-function snip(x){return x.type==="giftcard"?"🎁 "+(x.gift&&x.gift.name||""):x.type==="gift"?"🎁 "+(x.gname||""):String(x.text||"").slice(0,100)}
+function snip(x){return x.type==="trade"?"🛒 Сделка":x.type==="giftcard"?"🎁 "+(x.gift&&x.gift.name||""):x.type==="gift"?"🎁 "+(x.gname||""):String(x.text||"").slice(0,100)}
 let menuFor=null,toastT=null;
 function toast(t){const e=$("#toast");e.textContent=t;e.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>{e.hidden=true},2400)}
 function closeMenu(){menuFor=null;$("#menu").hidden=true}
@@ -516,7 +687,7 @@ function sheet(build,mode,id){
   const x=el("button","s sh-x","✕");x.title="Закрыть";x.onclick=closeSheet;s.appendChild(x);
   build(s);$("#sov").hidden=false;
 }
-function closeSheet(){$("#sov").hidden=true;sheetFor=null;sheetMode="";pend=undefined}
+function closeSheet(){$("#sov").hidden=true;sheetFor=null;sheetMode="";pend=undefined;S.lst=null}
 function openDrawer(){
   const d=$("#drawer");d.textContent="";
   const u=S.U[S.me]||{nick:"",bio:""};
@@ -525,7 +696,8 @@ function openDrawer(){
   d.appendChild(h);
   const it=(t,f,c)=>{const b=el("button","dit"+(c?" "+c:""),t);b.onclick=f;d.appendChild(b)};
   it("👤  Профиль",()=>{closeDrawer();openProfile(S.me)});
-  it("🎁  Магазин подарков",()=>{closeDrawer();S.view="shop";S.open=true;render(true)});
+  it("🎁  Магазин подарков",()=>{closeDrawer();S.shopTab="shop";S.view="shop";S.open=true;render(true)});
+  it("🛒  Маркет",()=>{closeDrawer();S.shopTab="market";S.view="shop";S.open=true;render(true)});
   {
     const b=el("button","dit tgl");b.setAttribute("role","switch");b.setAttribute("aria-checked",String(isDark()));
     b.appendChild(el("span","ic","🌙"));b.appendChild(el("span","lbl","Тёмная тема"));
@@ -554,13 +726,13 @@ function openProfile(id){
     const gl=(S.recv[id]||[]).slice().reverse();
     s.appendChild(el("label","","Подарки ("+gl.length+")"));
     if(!gl.length)s.appendChild(el("p","mu","Пока нет подарков"));
-    else{const g=el("div","pgrid");gl.forEach(i=>{const d=gcard(i);d.appendChild(el("div","gfrom","от "+nm(i.from)));g.appendChild(d)});s.appendChild(g)}
+    else{const g=el("div","pgrid");gl.forEach(i=>g.appendChild(itemCell(i)));s.appendChild(g)}
     if(id===S.me){
       const b=el("button","g2","🎁 Магазин подарков");b.onclick=()=>{closeSheet();S.view="shop";S.open=true;render(true)};s.appendChild(b);
       const e=el("button","p w","✎ Редактировать профиль");e.onclick=openEditor;s.appendChild(e);
     }else{
       const b=el("button","p w","Написать");b.onclick=()=>writeTo(id);s.appendChild(b);
-      const g=el("button","g2","🎁 Подарить");g.onclick=()=>{closeSheet();S.form.to=id;S.view="shop";S.open=true;render(true)};s.appendChild(g);
+      const g=el("button","g2","🎁 Подарить");g.onclick=()=>{closeSheet();S.form.to=id;S.shopTab="shop";S.view="shop";S.open=true;render(true)};s.appendChild(g);
       const blk=!!S.blocked[id],bl=el("button","g2"+(blk?"":" danger"),blk?"🔓 Разблокировать":"🚫 Заблокировать");bl.onclick=()=>toggleBlock(id);s.appendChild(bl);
       if(S.owner){
         let armed=false;const isb=!!S.banned[id];
@@ -666,7 +838,7 @@ function connect(){
   if(es)es.close();
   es=new EventSource(BASE+"/api/events?token="+encodeURIComponent(TOKEN));
   const on=(n,f)=>es.addEventListener(n,e=>f(JSON.parse(e.data)));
-  on("init",d=>{S.me=d.me.id;S.owner=d.me.owner;S.U={};S.nick={};S.members=d.members.map(m=>{setU(m);return m.id});S.coins=d.me.coins||0;S.lastDaily=d.me.lastDaily||0;S.blocked={};(d.blocked||[]).forEach(i=>{S.blocked[i]=1});S.banned={};(d.bans||[]).forEach(i=>{S.banned[i]=1});S.isBanned=!!d.me.banned;S.typing={};S.gifts=d.gifts;S.recv=d.received;S.msgs=d.messages;S.dms=d.dms||[];try{S.read=JSON.parse(ls.get("rd:"+S.me)||"{}")}catch(e){S.read={}}S.err="";S.auth="ok";showAuth();render(true)});
+  on("init",d=>{S.me=d.me.id;S.owner=d.me.owner;S.U={};S.nick={};S.members=d.members.map(m=>{setU(m);return m.id});S.coins=d.me.coins||0;S.lastDaily=d.me.lastDaily||0;S.market=d.market||[];S.catalog=d.catalog||null;S.blocked={};(d.blocked||[]).forEach(i=>{S.blocked[i]=1});S.banned={};(d.bans||[]).forEach(i=>{S.banned[i]=1});S.isBanned=!!d.me.banned;S.typing={};S.gifts=d.gifts;S.recv=d.received;S.msgs=d.messages;S.dms=d.dms||[];try{S.read=JSON.parse(ls.get("rd:"+S.me)||"{}")}catch(e){S.read={}}S.err="";S.auth="ok";showAuth();render(true)});
   on("msg",m=>{S.msgs.push(m);if(S.msgs.length>300)S.msgs.shift();render()});
   on("dm",m=>{delete S.typing[m.from];S.dms.push(m);render()});
   on("del",d=>{if(d.kind==="dm")S.dms=S.dms.filter(x=>x.id!==d.id);else S.msgs=S.msgs.filter(x=>x.id!==d.id);if(S.reply&&S.reply.id===d.id)S.reply=null;if(menuFor===d.id)closeMenu();render()});
@@ -680,7 +852,13 @@ function connect(){
   on("ban",d=>{S.isBanned=d.banned;toast(d.banned?"⛔ Владелец ограничил вам отправку сообщений":"✅ Ограничение снято");render(true)});
   on("bans",d=>{if(d.banned)S.banned[d.id]=1;else delete S.banned[d.id];render();if(!$("#sov").hidden&&sheetMode==="view"&&sheetFor===d.id)openProfile(d.id)});
   on("giftdel",d=>{S.gifts=S.gifts.filter(g=>g.id!==d.id);render()});
-  on("received",d=>{(S.recv[d.to]=S.recv[d.to]||[]).push(d.item);render();if(!$("#sov").hidden&&sheetMode==="view"&&sheetFor===d.to)openProfile(d.to);if(d.to===S.me)toast("🎁 "+nm(d.item.from)+" дарит вам «"+d.item.name+"»")});
+  on("received",d=>{d.item.owner=d.item.owner||d.to;applyItem(d.item);refreshItems();if(d.to===S.me)toast("🎁 "+nm(d.item.from)+" дарит вам «"+d.item.name+"»")});
+  /* Маркет в реальном времени: выставлен / снят / продан / передан / получил модель и фон */
+  on("listing",d=>{applyItem(d.item);refreshItems()});
+  on("unlist",d=>{applyItem(d.item);refreshItems()});
+  on("sold",d=>{applyItem(d.item);refreshItems();if(d.from===S.me)toast("💰 Куплен ваш подарок «"+d.item.name+"»: +"+fmt(d.price-d.fee)+" 🪙")});
+  on("transfer",d=>{applyItem(d.item);refreshItems();if(d.to===S.me)toast("🎁 "+nm(d.from)+" передал(а) вам «"+d.item.name+"»")});
+  on("rolled",d=>{applyItem(d.item);refreshItems()});
   es.onerror=async()=>{
     try{const r=await fetch(BASE+"/api/me?token="+encodeURIComponent(TOKEN));if(r.status===401)return logout()}
     catch(e){}
@@ -692,7 +870,7 @@ function logout(){
   closeDrawer();closeSheet();
   if(es){es.close();es=null}
   if(TOKEN)fetch(BASE+"/api/logout",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token:TOKEN})}).catch(()=>{});
-  TOKEN="";ls.set("tok","");S.auth="login";S.err="";S.msgs=[];S.dms=[];S.typing={};S.blocked={};S.banned={};S.isBanned=false;S.view="chat";first=true;showAuth();
+  TOKEN="";ls.set("tok","");S.auth="login";S.err="";S.msgs=[];S.dms=[];S.typing={};S.blocked={};S.banned={};S.isBanned=false;S.market=[];S.lst=null;S.view="chat";first=true;showAuth();
 }
 /* ---- экраны входа ---- */
 function field(ph,type,id){const i=el("input","f");i.placeholder=ph;i.type=type||"text";i.id=id;i.autocomplete="off";i.autocapitalize="off";return i}
