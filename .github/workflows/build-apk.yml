@@ -18,11 +18,24 @@ jobs:
       - name: Prepare Android project
         working-directory: app
         run: |
-          mkdir -p www
-          cp -f *.html *.webmanifest *.svg www/ 2>/dev/null || true
           npm install
           npx cap add android
           npx cap sync android
+      - name: Add POST_NOTIFICATIONS permission (Android 13, 14, 15)
+        working-directory: app
+        run: |
+          MANIFEST=android/app/src/main/AndroidManifest.xml
+          test -f "$MANIFEST" || { echo "::error::Не найден $MANIFEST"; exit 1; }
+          if grep -q 'android.permission.POST_NOTIFICATIONS' "$MANIFEST"; then
+            echo "Разрешение POST_NOTIFICATIONS уже есть в манифесте"
+          else
+            sed -i 's#</manifest>#    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n</manifest>#' "$MANIFEST"
+          fi
+          grep -q 'android.permission.POST_NOTIFICATIONS' "$MANIFEST" || { echo "::error::Не удалось добавить POST_NOTIFICATIONS"; exit 1; }
+          grep -n 'POST_NOTIFICATIONS' "$MANIFEST"
+          grep -q 'capacitor-local-notifications' android/capacitor.settings.gradle \
+            && echo "Плагин @capacitor/local-notifications подключён к Android-проекту" \
+            || echo "::warning::Плагин local-notifications не найден в capacitor.settings.gradle"
       - name: Build debug APK
         working-directory: app/android
         run: |
