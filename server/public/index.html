@@ -246,6 +246,7 @@ function av(id,txt,sm,bg){
   return d;
 }
 const ls={get:k=>{try{return localStorage.getItem(k)||""}catch(e){return""}},set:(k,v)=>{try{v?localStorage.setItem(k,v):localStorage.removeItem(k)}catch(e){}}};
+S.notif=ls.get("notif")!=="0";
 const isApp=!!window.Capacitor;
 let BASE=ls.get("srv")||(isApp?"":location.origin),TOKEN=ls.get("tok"),es=null;
 async function api(p,b){
@@ -256,19 +257,23 @@ async function api(p,b){
 }
 function thread(u){return S.dms.filter(m=>m.from===u||m.to===u)}
 function unread(u){const r=S.read[u]||0;return S.dms.filter(m=>m.from===u&&m.ts>r).length}
+const saveRd=()=>ls.set("rd:"+S.me,JSON.stringify(S.read));
+const unreadChat=()=>S.msgs.filter(x=>x.uid!==S.me&&x.ts>(S.read.chat||0)).length;
+const totalUnread=()=>unreadChat()+S.dms.filter(m=>m.from!==S.me&&m.ts>(S.read[m.from]||0)).length;
+const chatSeen=()=>!document.hidden&&(S.open||innerWidth>720);   // экран с чатом сейчас реально виден
 function side(){
   const l=$("#list");l.textContent="";
   const last=S.msgs[S.msgs.length-1],mine=(S.recv[S.me]||[]).length;
   let pv="Нет сообщений";
   if(last)pv=last.type==="gift"?"🎁 "+last.gname:(last.uid===S.me?"Вы: ":nm(last.uid)+": ")+(last.text||"");
-  const sys=[{k:"chat",c:"#3390ec",ic:"💬",t:"Общий чат",pv,tm:last?tm(last.ts):""},{k:"shop",c:"#e17076",ic:"🎁",t:"Магазин подарков",pv:"Баланс: "+fmt(S.coins)+" 🪙"}];
+  const sys=[{k:"chat",c:"#3390ec",ic:"💬",t:"Общий чат",pv,tm:last?tm(last.ts):"",un:unreadChat()},{k:"shop",c:"#e17076",ic:"🎁",t:"Магазин подарков",pv:"Баланс: "+fmt(S.coins)+" 🪙"}];
   if(S.owner)sys.push({k:"admin",c:"#7bc862",ic:"⚙",t:"Админ",pv:"Подарки и монеты"});
   const q=S.q.trim().toLowerCase();let n=0;
   const add=i=>{
     n++;const d=el("div","it"+(S.view===i.k?" on":""));
     d.appendChild(i.uid?avOn(i.uid):av(i.k,i.ic,0,i.c));
     const b=el("div","b"),r=el("div","r");r.appendChild(el("div","t",i.t));r.appendChild(el("div","mu",i.tm||""));b.appendChild(r);
-    const r2=el("div","r");r2.appendChild(el("div","mu pv",i.pv));if(i.un&&S.view!==i.k)r2.appendChild(el("div","bd2",String(i.un)));
+    const r2=el("div","r");r2.appendChild(el("div","mu pv",i.pv));if(i.un)r2.appendChild(el("div","bd2",i.un>99?"99+":String(i.un)));
     b.appendChild(r2);d.appendChild(b);
     d.onclick=()=>{S.view=i.k;S.open=true;if(i.uid){S.q="";$("#q").value=""}render(true)};l.appendChild(d);
   };
@@ -581,7 +586,11 @@ let first=true,lastView=null;
 function render(force){
   if(S.auth!=="ok")return;
   const dmv=S.view.startsWith("dm:"),peer=dmv?S.view.slice(3):null,th=dmv?thread(peer):[];
-  if(dmv&&th.length){const lt=th[th.length-1].ts;if((S.read[peer]||0)<lt){S.read[peer]=lt;ls.set("rd:"+S.me,JSON.stringify(S.read))}}
+  if(chatSeen()){   // прочитанным чат считается только когда он открыт и виден
+    if(dmv&&th.length){const lt=th[th.length-1].ts;if((S.read[peer]||0)<lt){S.read[peer]=lt;saveRd()}}
+    else if(S.view==="chat"&&S.msgs.length){const lt=S.msgs[S.msgs.length-1].ts;if((S.read.chat||0)<lt){S.read.chat=lt;saveRd()}}
+  }
+  const tu=totalUnread();document.title=(tu?"("+(tu>99?"99+":tu)+") ":"")+"Turbogram";
   $("#app").classList.toggle("open",S.open);
   side();head();
   const cv=S.view==="chat"||dmv,banLock=S.isBanned&&cv,blk=dmv&&!!S.blocked[peer];
@@ -716,6 +725,13 @@ function openDrawer(){
   it("🎁  Магазин подарков",()=>{closeDrawer();S.shopTab="shop";S.view="shop";S.open=true;render(true)});
   it("🛒  Маркет",()=>{closeDrawer();S.shopTab="market";S.view="shop";S.open=true;render(true)});
   it("🎨  Оформление и темы",openTheme);
+  {
+    const b=el("button","dit tgl");b.setAttribute("role","switch");b.setAttribute("aria-checked",String(S.notif));
+    b.appendChild(el("span","ic","🔔"));b.appendChild(el("span","lbl","Звук и уведомления"));
+    const sw=el("span","sw"+(S.notif?" on":""));sw.appendChild(el("i"));b.appendChild(sw);
+    b.onclick=()=>{S.notif=!S.notif;ls.set("notif",S.notif?"":"0");sw.classList.toggle("on",S.notif);b.setAttribute("aria-checked",String(S.notif));if(S.notif){permAsked=webAsked=false;askPerms(1);askPerms();snd()}};
+    d.appendChild(b);
+  }
   it("⚙  Настройки",openSettings);
   it("🚪  Выйти",()=>{closeDrawer();logout()},"red");
   d.appendChild(el("div","dft","Turbogram"));
@@ -878,9 +894,9 @@ function connect(){
   if(es)es.close();
   es=new EventSource(BASE+"/api/events?token="+encodeURIComponent(TOKEN));
   const on=(n,f)=>es.addEventListener(n,e=>f(JSON.parse(e.data)));
-  on("init",d=>{S.me=d.me.id;S.owner=d.me.owner;S.U={};S.nick={};S.members=d.members.map(m=>{setU(m);return m.id});S.coins=d.me.coins||0;S.lastDaily=d.me.lastDaily||0;S.market=d.market||[];S.catalog=d.catalog||null;S.blocked={};(d.blocked||[]).forEach(i=>{S.blocked[i]=1});S.banned={};(d.bans||[]).forEach(i=>{S.banned[i]=1});S.isBanned=!!d.me.banned;S.typing={};S.gifts=d.gifts;S.recv=d.received;S.msgs=d.messages;S.dms=d.dms||[];try{S.read=JSON.parse(ls.get("rd:"+S.me)||"{}")}catch(e){S.read={}}S.err="";S.auth="ok";showAuth();render(true)});
-  on("msg",m=>{S.msgs.push(m);if(S.msgs.length>300)S.msgs.shift();render()});
-  on("dm",m=>{delete S.typing[m.from];S.dms.push(m);render()});
+  on("init",d=>{S.me=d.me.id;S.owner=d.me.owner;S.U={};S.nick={};S.members=d.members.map(m=>{setU(m);return m.id});S.coins=d.me.coins||0;S.lastDaily=d.me.lastDaily||0;S.market=d.market||[];S.catalog=d.catalog||null;S.blocked={};(d.blocked||[]).forEach(i=>{S.blocked[i]=1});S.banned={};(d.bans||[]).forEach(i=>{S.banned[i]=1});S.isBanned=!!d.me.banned;S.typing={};S.gifts=d.gifts;S.recv=d.received;S.msgs=d.messages;S.dms=d.dms||[];try{S.read=JSON.parse(ls.get("rd:"+S.me)||"{}")}catch(e){S.read={}}if(S.read.chat===undefined){const l=S.msgs[S.msgs.length-1];S.read.chat=l?l.ts:0;saveRd()}S.err="";S.auth="ok";showAuth();render(true);askPerms(1);if(pendT){const t=pendT;pendT=null;openTarget(t)}});
+  on("msg",m=>{S.msgs.push(m);if(S.msgs.length>300)S.msgs.shift();noteChat(m);render()});
+  on("dm",m=>{delete S.typing[m.from];S.dms.push(m);noteDm(m);render()});
   on("del",d=>{if(d.kind==="dm")S.dms=S.dms.filter(x=>x.id!==d.id);else S.msgs=S.msgs.filter(x=>x.id!==d.id);if(S.reply&&S.reply.id===d.id)S.reply=null;if(menuFor===d.id)closeMenu();render()});
   on("member",m=>{if(!S.U[m.id])S.members.push(m.id);setU(m);render()});
   on("profile",m=>{setU(m);render();if(!$("#sov").hidden&&sheetMode==="view"&&sheetFor===m.id)openProfile(m.id);if($("#drawer").classList.contains("on"))openDrawer()});
@@ -966,6 +982,62 @@ E.forEach(e=>{const s=el("span","",e);s.onclick=()=>{$("#inp").value+=e;$("#inp"
 $("#emb").onclick=()=>{$("#emo").hidden=!$("#emo").hidden};
 $("#send").onclick=send;
 $("#inp").onkeydown=e=>{if(e.key==="Enter")send()};
+/* ---- уведомления: Android (LocalNotifications), браузер (Notification), мягкий звук (Web Audio) ---- */
+const LN=()=>window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.LocalNotifications;
+let AC=null,permAsked=false,webAsked=false,pendT=null,gestAt=0;
+function unlockAudio(){try{AC=AC||new(window.AudioContext||window.webkitAudioContext)();if(AC.state==="suspended")AC.resume()}catch(e){}}
+function snd(){   // короткий мягкий двойной «динь» из двух синусоид, без аудиофайлов
+  try{
+    unlockAudio();const t=AC.currentTime;
+    [[880,0],[1318.5,.12]].forEach(([f,d])=>{
+      const o=AC.createOscillator(),g=AC.createGain();o.type="sine";o.frequency.value=f;
+      g.gain.setValueAtTime(.0001,t+d);g.gain.exponentialRampToValueAtTime(.16,t+d+.02);g.gain.exponentialRampToValueAtTime(.0001,t+d+.3);
+      o.connect(g);g.connect(AC.destination);o.start(t+d);o.stop(t+d+.32);
+    });
+  }catch(e){}
+}
+// login=1: при входе (Android); без аргумента: по первому касанию (браузеры требуют жест пользователя)
+async function askPerms(login){
+  if(!S.notif)return;
+  const ln=LN();
+  try{
+    if(ln){
+      if(!login||permAsked)return;permAsked=true;
+      try{await ln.createChannel({id:"msgs",name:"Сообщения",description:"Сообщения, подарки и сделки",importance:4,visibility:1,vibration:true})}catch(e){}
+      await ln.requestPermissions();
+    }else if((!login||Date.now()-gestAt<5000)&&!webAsked&&window.Notification&&Notification.permission==="default"){webAsked=true;await Notification.requestPermission()}
+  }catch(e){}
+}
+function openTarget(t){   // t: «chat» или «dm:<id>»
+  if(S.auth!=="ok"){pendT=t;return}
+  closeSheet();closeDrawer();
+  if(t==="chat"||(/^dm:/.test(t)&&S.U[t.slice(3)])){S.view=t;S.open=true;S.q="";$("#q").value="";render(true)}
+}
+// уведомляем, если приложение свёрнуто или открыт другой чат; свои сообщения и открытый чат не трогаем
+function incoming(t,from,title,body){
+  if(from===S.me||!S.notif)return;
+  if(chatSeen()&&S.view===t)return;
+  snd();
+  const ln=LN();
+  if(ln){try{ln.schedule({notifications:[{id:Math.floor(Math.random()*2e9),title,body,channelId:"msgs",extra:{t}}]}).catch(()=>{})}catch(e){}}
+  else if(document.hidden&&window.Notification&&Notification.permission==="granted"){
+    try{const n=new Notification(title,{body,tag:t});n.onclick=()=>{try{window.focus()}catch(e){}openTarget(t);n.close()}}catch(e){}
+  }
+}
+const clip=(x,n)=>{x=String(x||"");return x.length>n?x.slice(0,n-1)+"…":x};
+function noteChat(m){
+  if(m.type==="gift")incoming("chat",m.uid,"Общий чат","🎁 "+nm(m.uid)+" дарит «"+(m.gname||"")+"»");
+  else incoming("chat",m.uid,"Общий чат",nm(m.uid)+": "+clip(m.text,140));
+}
+function noteDm(m){   // обычное сообщение, подарок, сделка на Маркете или передача
+  const t="dm:"+m.from,g=m.gift;
+  if(m.kind==="trade"&&g)incoming(t,m.from,g.type==="sale"?"💰 Маркет":"🎁 Передача",g.type==="sale"?(g.seller===S.me?"Ваш подарок «"+g.name+"» куплен: +"+fmt(g.payout)+" 🪙":"Сделка: «"+g.name+"»"):nm(g.from)+" передал(а) вам «"+g.name+"»");
+  else if(m.kind==="gift"&&g)incoming(t,m.from,"🎁 "+nm(m.from),"дарит вам «"+g.name+"»"+(g.note?": "+clip(g.note,80):""));
+  else incoming(t,m.from,nm(m.from),clip(m.text,140));
+}
+["pointerdown","keydown","touchstart"].forEach(ev=>document.addEventListener(ev,()=>{gestAt=Date.now();unlockAudio();if(S.auth==="ok")askPerms()},{passive:true}));
+document.addEventListener("visibilitychange",()=>{if(!document.hidden&&S.auth==="ok")render()});
+{const ln=LN();if(ln&&ln.addListener)try{ln.addListener("localNotificationActionPerformed",e=>{const x=(e&&e.notification&&e.notification.extra)||{};if(x.t)openTarget(x.t)})}catch(e){}}
 let lastTyping=0;
 $("#inp").addEventListener("input",()=>{
   if(!S.view.startsWith("dm:")||S.auth!=="ok"||S.isBanned||!$("#inp").value.trim())return;
